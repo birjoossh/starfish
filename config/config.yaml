@@ -1,0 +1,42 @@
+# Nifty 50 Dashboard — Threshold Configuration
+# All signal thresholds live here so they can be tuned without code changes.
+
+# Series filter: only ingest these NSE trading series
+series_filter:
+  - EQ
+  - BE
+  - BL
+  - SM
+  - ST
+
+# Volume analysis
+volume:
+  avg_window_days: 20        # Rolling average window
+  long_avg_window_days: 60   # Long-term average for trend
+  spike_mild: 1.2            # 20% above average
+  spike_moderate: 1.5        # 50% above average
+  spike_high: 2.0            # 100% above average
+  spike_extreme: 3.0         # 200% above average
+
+# Return windows (trading days)
+returns:
+  short_window: 1            # 1D return
+  medium_window: 21          # ~1 month
+  long_window: 63            # ~3 months
+  yearly_window: 252         # ~1 year
+
+# 52-week computation
+fifty_two_week:
+  lookback_days: 252         # Trading days (not calendar)
+
+# Sector breadth
+sector_breadth:
+  all_advancing_threshold: 0  # 0 declining = all advancing
+  all_declining_threshold: 0  # 0 advancing = all declining
+
+# Watchlist
+watchlist:
+  default_symbols:
+    - RELIANCE
+    - HDFCBANK
+    - INFY

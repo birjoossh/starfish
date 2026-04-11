@@ -1,0 +1,67 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGlow" x1="60" y1="40" x2="320" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4ADE80" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#22C55E" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="armGrad1" x1="210" y1="80" x2="315" y2="174" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86EFAC"/>
+      <stop offset="1" stop-color="#16A34A"/>
+    </linearGradient>
+    <linearGradient id="armGrad2" x1="248" y1="156" x2="338" y2="276" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4ADE80"/>
+      <stop offset="1" stop-color="#15803D"/>
+    </linearGradient>
+    <linearGradient id="armGrad3" x1="160" y1="176" x2="256" y2="328" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86EFAC"/>
+      <stop offset="1" stop-color="#166534"/>
+    </linearGradient>
+    <linearGradient id="armGrad4" x1="82" y1="152" x2="180" y2="278" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4ADE80"/>
+      <stop offset="1" stop-color="#15803D"/>
+    </linearGradient>
+    <linearGradient id="armGrad5" x1="110" y1="74" x2="214" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86EFAC"/>
+      <stop offset="1" stop-color="#16A34A"/>
+    </linearGradient>
+    <radialGradient id="coreGrad" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(198 190) rotate(90) scale(74)">
+      <stop stop-color="#DCFCE7"/>
+      <stop offset="0.64" stop-color="#4ADE80"/>
+      <stop offset="1" stop-color="#15803D"/>
+    </radialGradient>
+    <filter id="softShadow" x="12" y="18" width="372" height="342" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#4ADE80" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- transparent background -->
+  <rect width="1200" height="420" rx="30" fill="transparent"/>
+  <ellipse cx="198" cy="190" rx="138" ry="122" fill="url(#bgGlow)"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M192 164C180 138 182 104 196 80C204 65 227 63 240 76C253 90 259 113 254 135C249 157 229 174 206 176C200 177 195 173 192 164Z" fill="url(#armGrad1)"/>
+    <path d="M218 184C242 177 269 182 292 196C307 205 310 228 298 241C286 255 266 263 244 262C221 261 201 246 193 224C191 217 195 210 202 206L218 184Z" fill="url(#armGrad2)"/>
+    <path d="M198 214C212 234 216 261 210 288C206 306 186 316 169 308C152 299 140 281 139 259C137 236 149 215 168 203C174 199 181 200 186 205L198 214Z" fill="url(#armGrad3)"/>
+    <path d="M172 203C150 212 123 212 99 203C83 196 76 175 86 160C97 145 116 135 138 133C161 131 182 142 194 161C198 167 197 174 192 179L172 203Z" fill="url(#armGrad4)"/>
+    <path d="M178 177C161 160 151 134 151 108C152 90 169 76 187 80C205 84 221 97 229 118C238 139 234 163 219 180C214 185 207 186 201 184L178 177Z" fill="url(#armGrad5)"/>
+    <circle cx="198" cy="190" r="62" fill="url(#coreGrad)"/>
+  </g>
+
+  <circle cx="164" cy="127" r="7" fill="#F87171"/>
+  <circle cx="255" cy="227" r="8" fill="#EF4444"/>
+  <circle cx="132" cy="238" r="6" fill="#FB7185"/>
+  <circle cx="220" cy="104" r="5" fill="#FCA5A5"/>
+  <circle cx="193" cy="190" r="6" fill="#ECFCCB" opacity="0.9"/>
+  <circle cx="173" cy="171" r="5" fill="#ECFCCB" opacity="0.82"/>
+  <circle cx="218" cy="174" r="5" fill="#ECFCCB" opacity="0.82"/>
+  <circle cx="184" cy="213" r="5" fill="#ECFCCB" opacity="0.82"/>
+  <circle cx="211" cy="213" r="5" fill="#ECFCCB" opacity="0.82"/>
+
+  <g>
+    <text x="370" y="188" fill="#DCFCE7" font-size="98" font-weight="800" font-family="Inter, Segoe UI, Arial, sans-serif" letter-spacing="-2">starfish</text>
+    <text x="374" y="238" fill="#4ADE80" font-size="28" font-weight="600" font-family="Inter, Segoe UI, Arial, sans-serif" letter-spacing="2.4">NIFTY 50 · INVESTMENT INTELLIGENCE</text>
+    <path d="M374 258H780" stroke="#2D4A3E" stroke-width="8" stroke-linecap="round"/>
+    <path d="M374 258H690" stroke="#22C55E" stroke-width="8" stroke-linecap="round"/>
+    <path d="M690 258H735" stroke="#F87171" stroke-width="8" stroke-linecap="round" opacity="0.68"/>
+  </g>
+</svg>

@@ -1,0 +1,28 @@
+returns:
+  # Factor 1
+  min_return_3m: 0.15 # For Momentum rules
+  min_return_1y: 0.30
+  acc_max_return_1y: -0.20 # For Accumulation rules
+
+relative_strength:
+  # Factor 2
+  mom_min_rs_3m: 0.0
+
+drawdowns:
+  # Factor 3 & Fall Knife
+  acc_min_drawdown: -0.20 # e.g. -20%
+  falling_knife_return_3m: -0.20
+
+volume:
+  # Factor 4 & Momentum expansion
+  mom_min_vol_expansion: 1.0
+  acc_max_vol_ratio: 1.0
+
+tiers:
+  # For Momentum
+  mom_watch_min: 50
+  mom_confirmed_min: 65
+  mom_strong_min: 80
+  
+  # For Accumulation
+  acc_floor: 25
