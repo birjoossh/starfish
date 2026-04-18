@@ -19,8 +19,10 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import time
+import urllib.parse
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -34,11 +36,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# NSE archive URLs
-# NSE archive base URL
+# NSE Archives URL
+NSE_ARCHIVES_BASE = "https://nsearchives.nseindia.com/products/content"
 NSE_ARCHIVE_URL = "https://archives.nseindia.com"
-NSE_EQUITIES_PATH = "content/historical/EQUITIES"
-NSE_INDEX_PATH = "content/indices"
 
 MONTH_ABBR = {
     1: "JAN", 2: "FEB", 3: "MAR", 4: "APR",
@@ -90,17 +90,18 @@ class NSEHistoricalDownloader:
         return f"ind_close_all_{trade_date.strftime('%d%m%Y')}.csv"
 
     def _bhavcopy_url(self, trade_date: date) -> str:
-        """Generate bhavcopy download URL."""
-        year = trade_date.strftime("%Y")
-        month = trade_date.strftime("%b").upper()
-        day = trade_date.strftime("%d")
-        # Format: cm02JAN2024bhav.csv.zip
-        filename = f"cm{day}{month}{year}bhav.csv.zip"
-        return f"{NSE_ARCHIVE_URL}/{NSE_EQUITIES_PATH}/{year}/{month}/{filename}"
+        """Generate bhavcopy download URL.
+
+        Format: https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_DDMMYYYY.csv
+        """
+        # Format: sec_bhavdata_full_DDMMYYYY.csv
+        date_str = trade_date.strftime("%d%m%Y")
+        return f"{NSE_ARCHIVES_BASE}/sec_bhavdata_full_{date_str}.csv"
 
     def _index_url(self, trade_date: date) -> str:
         """Generate index download URL."""
-        return f"{NSE_ARCHIVE_URL}/{NSE_INDEX_PATH}/{self._index_filename(trade_date)}"
+        date_str = trade_date.strftime("%d%m%Y")
+        return f"{NSE_ARCHIVES_BASE}/ind_close_all_{date_str}.csv"
 
     def _bhavcopy_path(self, trade_date: date) -> Path:
         """Get local bhavcopy path (ZIP file)."""
@@ -132,24 +133,50 @@ class NSEHistoricalDownloader:
         return False
 
     def download_bhavcopy(self, trade_date: date, force: bool = False) -> dict:
-        """Download single bhavcopy file using existing NSEClient."""
+        """Download single bhavcopy file using NSE API."""
         csv_path = self._bhavcopy_csv_path(trade_date)
 
         # Check if already downloaded
         if csv_path.exists() and not force:
             return {"status": "skipped", "reason": "exists", "path": csv_path}
 
-        try:
-            # Use existing NSEClient to download and extract
-            path = self.client.download_bhavcopy(trade_date, output_dir=self.bhavcopy_dir)
+        # Apply rate limiting
+        self._rate_limit()
 
-            if path and path.exists():
-                self.request_count += 1
-                self.consecutive_failures = 0
-                logger.info(f"Downloaded: {path.name}")
-                return {"status": "success", "path": path}
-            else:
+        try:
+            # Get the API URL
+            url = self._bhavcopy_url(trade_date)
+            logger.debug(f"Downloading: {url}")
+
+            # Use the client's session for the request
+            resp = self.client._session.get(url, timeout=30)
+
+            if resp.status_code == 404:
                 return {"status": "skipped", "reason": "no data", "date": trade_date}
+
+            resp.raise_for_status()
+
+            # Save the CSV file directly
+            csv_filename = f"sec_bhavdata_full_{trade_date.strftime('%d%m%Y')}.csv"
+            csv_path_save = self.bhavcopy_dir / csv_filename
+
+            with open(csv_path_save, "wb") as f:
+                f.write(resp.content)
+
+            # Rename to expected format for the parser
+            csv_path_expected = self._bhavcopy_csv_path(trade_date)
+
+            # Remove existing file if exists
+            if csv_path_expected.exists():
+                csv_path_expected.unlink()
+
+            csv_path_save.rename(csv_path_expected)
+
+            self.request_count += 1
+            self.consecutive_failures = 0
+            logger.info(f"Downloaded: {csv_path.name}")
+
+            return {"status": "success", "path": csv_path}
 
         except Exception as e:
             self.consecutive_failures += 1
