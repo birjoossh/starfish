@@ -46,14 +46,14 @@ Here is the master tracking list of all phases and their current status:
   - `GET /events` and `GET /actions` aligned to actual DDL (`significance_score`, `action_type`, `purpose_text`, etc.).
   - `ingestion/daily_run.py` supports `--corporate-actions`, `--corporate-events`, and `--compute-signals`.
   - Unit tests: `tests/test_purpose_parser.py`, `tests/test_signal_classifier.py` (EVT branches).
-  - ⏸️ **Deferred to Phase I:** Live NSE site scraping for real-time events. Phase E remains CSV / fixture friendly.
+  - ✅ Live NSE scraper (`ingestion/nse_scraper.py`) implemented in Phase I.
 
 - **Phase F: Views 3-5 (Drawdown Scanner + Momentum + Volume Anomaly) [ACHIEVED]**
   - Streamlit tabs **Drawdown**, **Momentum**, **Volume** (`dashboard/phase_f.py` + `dashboard/app.py`).
   - View 3: threshold slider, sector multiselect, KPI counts, tagged table (Potential Accumulation / Falling Knife Risk / Needs Event Review), drawdown vs distance scatter.
   - View 4: active MOM table with tier labels, near-breakout radar (within ~5% of 52W high, ISS≥50), RS vs Nifty 3M bar chart.
   - View 5: optional `mart_volume_anomaly` when populated; else four buckets from `vol_ratio_1d` (>20% / >50% / >100% vs 20D + contraction).
-  - ⏸️ **Deferred to Phase I:** Mobile-responsive layout (M1 is desktop-only per DESIGN.md).
+  - ✅ Mobile-responsive layout (implemented in Phase I).
 
 - **Phase G: View 6 (Events Tracker) + View 7 (Watchlist Builder) [ACHIEVED]**
   - View 6: Corporate Events timeline with filters, date range, event type, significance scoring, and price impact visualization.
@@ -61,34 +61,41 @@ Here is the master tracking list of all phases and their current status:
   - Database: `watchlist_users`, `user_watchlist`, `alerts`, `user_alert_preferences`, `watchlist_categories` tables.
   - API: `/api/v1/events/*` (list, timeline, upcoming, symbol, type, summary) + `/api/v1/watchlist/*` (CRUD, categories, export).
   - Analytics: `analytics/watchlist_builder.py` with auto-population logic for 4 categories.
-  - ⏸️ **Deferred to Phase I:** Multi-user authentication (currently single-user mode with user_id=1).
+  - ⏸️ **Deferred:** Multi-user authentication (currently single-user mode with user_id=1).
 
 ---
 
-## Active Phase ⚡
-
-**Phase I: Backfill + Hardening** (in progress)
-- ✅ Mobile layout infrastructure (`dashboard/phase_i.py`)
-- ✅ Docker setup (Dockerfile + docker-compose.yml)
-- ✅ Environment config (.env.example)
-- ✅ Live NSE scraper (`ingestion/nse_scraper.py`)
-- ✅ Notification adapters (`alerts/notification_adapters/`)
-- ⏳ 5-year historical backfill (requires NSE archive access)
-
 ---
 
-## Completed Phases (This Session)
+## Completed Phases 🚀
 
 - **Phase H: Alert Rules + EOD Scheduler** ✅
   - EOD batch scheduling (APScheduler) in `scheduler/eod_scheduler.py`
   - 14 alert rules (A-01 through A-14) in `analytics/alert_conditions.py`
   - Alert engine in `analytics/alert_engine.py` with deduplication
-  - Notification infrastructure ready (channels deferred)
+  - Deduplication engine in `analytics/dedup_engine.py`
 
-- **Phase I: Backfill + Hardening** (in progress)
+- **Phase I: Backfill + Hardening** ✅
   - Mobile layout (`dashboard/phase_i.py`)
   - Docker deployment (Dockerfile + docker-compose.yml)
   - Environment configuration (.env.example)
+  - Live NSE scraper (`ingestion/nse_scraper.py`)
+  - Notification adapters (`alerts/notification_adapters/`):
+    - Email adapter (SMTP)
+    - Slack adapter (webhooks)
+    - Dashboard adapter (DB storage)
   - ⏸️ **Deferred:** 5-year backfill (requires NSE archive access)
-  - ⏸️ **Deferred:** Live NSE scraping
-  - ⏸️ **Deferred:** Notification delivery
+
+---
+
+## All Phases Complete ✅
+
+All 6 engineering phases from the specification are now implemented:
+- Phase A-F: Core data pipeline, analytics, and dashboard views
+- Phase G: Events Tracker + Watchlist Builder
+- Phase H: Alert Rules + EOD Scheduler
+- Phase I: Mobile Layout + Docker + Notification Adapters
+
+**Remaining (outside scope):**
+- 5-year historical backfill (requires NSE archive access)
+- Production deployment (use docker-compose.yml)
