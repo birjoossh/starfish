@@ -71,9 +71,9 @@ Here is the master tracking list of all phases and their current status:
 - ✅ Mobile layout infrastructure (`dashboard/phase_i.py`)
 - ✅ Docker setup (Dockerfile + docker-compose.yml)
 - ✅ Environment config (.env.example)
+- ✅ Live NSE scraper (`ingestion/nse_scraper.py`)
+- ✅ Notification adapters (`alerts/notification_adapters/`)
 - ⏳ 5-year historical backfill (requires NSE archive access)
-- ⏳ Live NSE scraping (deferred from Phase E)
-- ⏳ Notification delivery (deferred from Phase H)
 
 ---
 
