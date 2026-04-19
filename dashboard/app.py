@@ -10,6 +10,16 @@ import requests
 import plotly.express as px
 
 from config.database import read_sql_df
+from dashboard.phase_f import (
+    load_signals_for_phase_f,
+    render_drawdown_tab,
+    render_momentum_tab,
+    render_volume_tab,
+)
+from dashboard.phase_g import (
+    render_events_tracker,
+    render_watchlist_builder,
+)
 from dashboard.watchlist import load_watchlist
 
 API_URL = "http://localhost:8000"
@@ -36,21 +46,8 @@ def get_movers_data(selected_date: str):
 
 @st.cache_data(ttl=60)
 def load_screener_signals(calc_date: str) -> pd.DataFrame:
-    df = read_sql_df("""
-        SELECT s.calc_date, s.symbol, d.company_name, d.sector,
-               p.close, s.return_1d, s.return_1m, s.return_3m, s.return_1y,
-               s.vol_ratio_1d, s.vol_ratio_5d, s.vol_ratio_20d,
-               s.avg_volume_20d, s.volume_trend_3m,
-               s.drawdown_from_52w_high_pct, s.distance_from_52w_low_pct,
-               s.signal_category, s.momentum_flag, s.accumulation_flag,
-               s.iss_score
-        FROM mart_stock_signals s
-        JOIN dim_stock d ON s.symbol = d.symbol
-        LEFT JOIN fact_eod_price p ON s.symbol = p.symbol AND s.calc_date = p.trade_date
-        WHERE s.calc_date = :calc_date
-        ORDER BY s.symbol
-    """, params={"calc_date": calc_date})
-    return df
+    """Full mart slice for Overview + Phase F views (cached)."""
+    return load_signals_for_phase_f(calc_date)
 
 def main():
     st.set_page_config(
@@ -132,10 +129,34 @@ def main():
 
     st.markdown("---")
 
-    # Fetch Unified Data
+    tab_overview, tab_dd, tab_mom, tab_vol, tab_events, tab_watchlist = st.tabs(
+        ["Overview", "Drawdown", "Momentum", "Volume", "Events", "Watchlist"]
+    )
+
+    signals_df = load_screener_signals(str(selected_date))
+
+    with tab_dd:
+        render_drawdown_tab(signals_df)
+    with tab_mom:
+        render_momentum_tab(signals_df)
+    with tab_vol:
+        render_volume_tab(signals_df, str(selected_date))
+    with tab_events:
+        render_events_tracker()
+    with tab_watchlist:
+        render_watchlist_builder()
+
+    with tab_overview:
+        _render_overview(
+            selected_date,
+            signals_df,
+        )
+
+
+def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
+    """Views 1–2 plus master screener (existing single-page layout)."""
     market_data = get_market_data(str(selected_date))
     movers_data = get_movers_data(str(selected_date))
-    signals_df  = load_screener_signals(str(selected_date))
     watchlist = load_watchlist()
 
     # Data extraction
@@ -328,6 +349,7 @@ def main():
                 "ISS": st.column_config.NumberColumn(format="%.0f"),
             },
         )
+
 
 if __name__ == "__main__":
     main()

@@ -25,10 +25,25 @@ from config.thresholds import get_series_filter
 logger = logging.getLogger(__name__)
 
 # Expected columns in NSE bhavcopy CSV
+# Old format (2023-2024): SYMBOL, SERIES, OPEN, HIGH, LOW, CLOSE, etc.
+# New format (2025+): SYMBOL, SERIES, OPEN_PRICE, HIGH_PRICE, LOW_PRICE, CLOSE_PRICE, etc.
 EXPECTED_COLUMNS = {
     "SYMBOL", "SERIES", "OPEN", "HIGH", "LOW", "CLOSE",
     "PREVCLOSE", "TOTTRDQTY", "TOTTRDVAL", "TIMESTAMP",
     "TOTALTRADES", "ISIN",
+}
+
+# Alternative column names for new format
+COLUMN_ALIASES = {
+    "OPEN_PRICE": "OPEN",
+    "HIGH_PRICE": "HIGH",
+    "LOW_PRICE": "LOW",
+    "CLOSE_PRICE": "CLOSE",
+    "PREV_CLOSE": "PREVCLOSE",
+    "TTL_TRD_QNTY": "TOTTRDQTY",
+    "TURNOVER_LACS": "TOTTRDVAL",
+    "NO_OF_TRADES": "TOTALTRADES",
+    "DATE1": "TIMESTAMP",
 }
 
 # NSE date format in TIMESTAMP column: DD-MMM-YYYY
@@ -135,9 +150,25 @@ class BhavcopyParser:
 
         CRITICAL: This prevents the silent empty pipeline failure identified
         in the eng review. If NSE renames columns, we catch it here.
+        Also handles new format (2025+) with column aliases.
         """
-        actual_columns = set(df.columns.str.upper())
-        missing = EXPECTED_COLUMNS - actual_columns
+        # Strip whitespace first
+        df.columns = df.columns.str.strip()
+
+        # Check for columns with aliases applied
+        actual_columns = set(df.columns) | set(COLUMN_ALIASES.keys())
+
+        # Check if aliases can help
+        available_columns = set(df.columns)
+        for new_col in COLUMN_ALIASES:
+            if new_col in available_columns:
+                actual_columns.add(COLUMN_ALIASES[new_col])
+
+        # ISIN is optional in new format - make it optional
+        required_columns = EXPECTED_COLUMNS - {"ISIN"}
+        missing = required_columns - actual_columns
+
+        if missing:
 
         if missing:
             raise BhavcopyParseError(
@@ -166,10 +197,49 @@ class BhavcopyParser:
                 f"Cannot parse date '{date_str}' from TIMESTAMP column in {file_path}"
             )
 
+    def _apply_column_aliases(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Apply column name aliases for new NSE format (2025+).
+
+        New format uses: OPEN_PRICE, HIGH_PRICE, LOW_PRICE, CLOSE_PRICE, etc.
+        Old format uses: OPEN, HIGH, LOW, CLOSE, etc.
+        """
+        # Clean column names (remove leading/trailing whitespace)
+        df.columns = df.columns.str.strip()
+
+        # Build rename mapping for new format columns that exist
+        # Only rename if the old format column doesn't exist
+        rename_map = {}
+        for new_name, old_name in COLUMN_ALIASES.items():
+            if new_name in df.columns:
+                # Rename new format column to old format
+                if old_name not in df.columns:
+                    rename_map[new_name] = old_name
+                else:
+                    # Both exist - drop the new format column (use old)
+                    rename_map[new_name] = None  # Mark for removal
+
+        # Apply renames
+        cols_to_drop = []
+        for old, new in [(v, k) for k, v in rename_map.items() if v is None]:
+            cols_to_drop.append(old)
+
+        df = df.drop(columns=[c for c in cols_to_drop if c in df.columns], errors='ignore')
+
+        if rename_map:
+            actual_renames = {k: v for k, v in rename_map.items() if v is not None and v is not None}
+            if actual_renames:
+                logger.debug(f"Renaming columns: {actual_renames}")
+                df = df.rename(columns=actual_renames)
+
+        return df
+
     def _map_columns(
         self, df: pd.DataFrame, trade_date: date, source_file: str
     ) -> pd.DataFrame:
         """Map NSE bhavcopy columns to fact_eod_price schema."""
+        # First apply column aliases for new format (2025+)
+        df = self._apply_column_aliases(df)
+
         result = pd.DataFrame({
             "trade_date": trade_date,
             "symbol": df["SYMBOL"].str.strip(),

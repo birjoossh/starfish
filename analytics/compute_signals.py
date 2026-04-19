@@ -80,27 +80,59 @@ def load_index_prices(trade_date: date | None = None) -> pd.DataFrame:
 
 
 def load_event_data(trade_date: date | None = None) -> pd.DataFrame:
-    """Load most-recent and next event per symbol from fact_corporate_event."""
+    """Load most-recent past event and nearest future event per symbol from fact_corporate_event.
+
+    Past row powers ISS Factor 5 and the first EVT branch (recent significant event).
+    Future row powers the second EVT branch (upcoming event within 10 days).
+    """
     engine = get_engine()
     ref_date = trade_date or date.today()
     query = text("""
         WITH ranked_past AS (
             SELECT symbol, event_date, event_type, significance_score,
                    (CAST(:ref_date AS DATE) - event_date) AS days_since,
-                   ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY event_date DESC) AS rn
+                   ROW_NUMBER() OVER (
+                       PARTITION BY symbol
+                       ORDER BY event_date DESC, significance_score DESC
+                   ) AS rn
             FROM fact_corporate_event
             WHERE event_date <= CAST(:ref_date AS DATE)
+        ),
+        past AS (
+            SELECT symbol,
+                   event_date AS last_event_date,
+                   event_type AS last_event_type,
+                   significance_score AS event_significance,
+                   days_since AS days_since_last_event
+            FROM ranked_past
+            WHERE rn = 1
+        ),
+        ranked_future AS (
+            SELECT symbol, event_date, significance_score,
+                   (event_date - CAST(:ref_date AS DATE)) AS days_to_next,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY symbol
+                       ORDER BY event_date ASC, significance_score DESC
+                   ) AS rn
+            FROM fact_corporate_event
+            WHERE event_date > CAST(:ref_date AS DATE)
+        ),
+        future AS (
+            SELECT symbol,
+                   days_to_next AS days_to_next_event,
+                   significance_score AS next_event_significance
+            FROM ranked_future
+            WHERE rn = 1
         )
-        SELECT
-            p.symbol,
-            p.event_date            AS last_event_date,
-            p.event_type            AS last_event_type,
-            p.significance_score    AS event_significance,
-            p.days_since            AS days_since_last_event,
-            NULL::int               AS days_to_next_event,
-            NULL::int               AS next_event_significance
-        FROM ranked_past p
-        WHERE p.rn = 1
+        SELECT COALESCE(past.symbol, future.symbol) AS symbol,
+               past.last_event_date,
+               past.last_event_type,
+               past.event_significance,
+               past.days_since_last_event,
+               future.days_to_next_event,
+               future.next_event_significance
+        FROM past
+        FULL OUTER JOIN future ON past.symbol = future.symbol
     """)
     try:
         return pd.read_sql_query(query, engine, params={"ref_date": str(ref_date)})
@@ -205,12 +237,19 @@ def compute_signals(trade_date: date | None = None) -> int:
     merged["days_since_last_event"] = merged["days_since_last_event"]
     merged["event_flag"] = False  # will be recomputed below
 
-    # Populate derived event flag
-    merged["event_flag"] = (
-        merged["days_since_last_event"].notna() &
-        (merged["days_since_last_event"] <= 20) &
-        (merged["event_significance"].fillna(0) >= 3)
+    # Derived event flag: recent past event OR significant upcoming event (matches EVT gates)
+    past_evt = (
+        merged["days_since_last_event"].notna()
+        & (merged["days_since_last_event"] <= 20)
+        & (merged["event_significance"].fillna(0) >= 3)
     )
+    upcoming_evt = (
+        merged["days_to_next_event"].notna()
+        & (merged["days_to_next_event"] >= 0)
+        & (merged["days_to_next_event"] <= 10)
+        & (merged["next_event_significance"].fillna(0) >= 3)
+    )
+    merged["event_flag"] = past_evt | upcoming_evt
 
     # Fill NaN for non-nullable columns (insufficient history → 0)
     not_null_defaults = {

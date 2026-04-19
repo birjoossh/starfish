@@ -6,20 +6,49 @@ Endpoints:
     GET /prices/{symbol} — Full price history for a symbol
     GET /prices/{symbol}/range — Filtered price history by date range
 
+    /events              — Corporate events router
+    /watchlist           — Watchlist management router
+
 Usage:
     uvicorn api.main:app --reload
 """
 
 from __future__ import annotations
 
+import math
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config.database import check_db_health, read_sql_df
+
+# Import routers
+from api.routers import events, watchlist
+
+
+def _sanitize_api_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Replace NaN/inf numeric placeholders so JSON encoding succeeds."""
+    out: list[dict[str, Any]] = []
+    for rec in records:
+        row: dict[str, Any] = {}
+        for k, v in rec.items():
+            if v is None:
+                row[k] = None
+                continue
+            try:
+                fv = float(v)
+                if math.isnan(fv) or math.isinf(fv):
+                    row[k] = None
+                    continue
+            except (TypeError, ValueError):
+                pass
+            row[k] = v
+        out.append(row)
+    return out
+
 
 app = FastAPI(
     title="Nifty 50 Dashboard API",
@@ -33,6 +62,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(events.router, prefix="/api/v1")
+app.include_router(watchlist.router, prefix="/api/v1")
 
 
 # ---- Response models ----
@@ -80,7 +113,7 @@ def get_constituents():
         SELECT symbol, company_name, sector, industry, nifty50_member, isin
         FROM dim_stock
         WHERE nifty50_member = TRUE
-        ORDER BY symbol
+        ORDER BY symbol COLLATE "C"
     """)
     if df.empty:
         return []
@@ -203,35 +236,44 @@ def get_events(
     event_type: Optional[str] = Query(None),
     min_significance: int = Query(1),
 ):
-    """List corporate events with optional filters."""
+    """List corporate events with optional filters (reads fact_corporate_event)."""
     conditions = ["1=1"]
     params: dict = {}
     if symbol:
-        conditions.append("symbol = :symbol")
-        params["symbol"] = symbol.upper()
+        conditions.append("symbol = :ev_symbol")
+        params["ev_symbol"] = symbol.upper()
     if from_date:
-        conditions.append("event_date >= :from_date")
-        params["from_date"] = from_date
+        conditions.append("event_date >= :ev_from_date")
+        params["ev_from_date"] = from_date
     if to_date:
-        conditions.append("event_date <= :to_date")
-        params["to_date"] = to_date
+        conditions.append("event_date <= :ev_to_date")
+        params["ev_to_date"] = to_date
     if event_type:
-        conditions.append("event_type = :event_type")
-        params["event_type"] = event_type.upper()
+        conditions.append(
+            "(LOWER(event_type) = LOWER(:ev_event_type) "
+            "OR UPPER(COALESCE(raw_announcement_text, '')) LIKE UPPER(:ev_type_like) "
+            "OR UPPER(COALESCE(event_summary, '')) LIKE UPPER(:ev_type_like))"
+        )
+        params["ev_event_type"] = event_type.strip()
+        params["ev_type_like"] = f"%{event_type.strip()}%"
     if min_significance > 1:
-        conditions.append("significance >= :min_sig")
-        params["min_sig"] = min_significance
+        conditions.append("significance_score >= :ev_min_sig")
+        params["ev_min_sig"] = min_significance
 
     where = " AND ".join(conditions)
     df = read_sql_df(f"""
-        SELECT symbol, event_date, event_type, significance, estimated_significance,
-               is_upcoming, description, source_file
+        SELECT symbol, event_date, event_type,
+               significance_score AS significance,
+               categorization_method,
+               event_summary AS description,
+               raw_announcement_text,
+               (event_date > CURRENT_DATE) AS is_upcoming
         FROM fact_corporate_event
         WHERE {where}
         ORDER BY event_date DESC LIMIT 500
     """, params=params)
     df["event_date"] = df["event_date"].apply(lambda d: d.isoformat() if hasattr(d, "isoformat") else d)
-    return df.to_dict("records")
+    return _sanitize_api_records(df.to_dict("records"))
 
 
 @app.get("/actions")
@@ -241,26 +283,32 @@ def get_actions(
     to_date: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
 ):
-    """List corporate actions (dividends, splits, bonuses)."""
+    """List corporate actions (dividends, splits, bonuses) from fact_corporate_action."""
     conditions = ["1=1"]
     params: dict = {}
     if symbol:
-        conditions.append("symbol = :symbol")
-        params["symbol"] = symbol.upper()
+        conditions.append("symbol = :ca_symbol")
+        params["ca_symbol"] = symbol.upper()
     if from_date:
-        conditions.append("ex_date >= :from_date")
-        params["from_date"] = from_date
+        conditions.append("ex_date >= :ca_from_date")
+        params["ca_from_date"] = from_date
     if to_date:
-        conditions.append("ex_date <= :to_date")
-        params["to_date"] = to_date
+        conditions.append("ex_date <= :ca_to_date")
+        params["ca_to_date"] = to_date
     if event_type:
-        conditions.append("event_type = :event_type")
-        params["event_type"] = event_type.upper()
+        conditions.append("LOWER(action_type) = LOWER(:ca_action_type)")
+        params["ca_action_type"] = event_type.strip()
 
     where = " AND ".join(conditions)
     df = read_sql_df(f"""
-        SELECT symbol, purpose, event_type, ex_date, record_date,
-               significance, amount, ratio_num, ratio_den
+        SELECT symbol,
+               purpose_text AS purpose,
+               action_type AS event_type,
+               ex_date, record_date,
+               CAST(NULL AS INTEGER) AS significance,
+               dividend_amount_per_share AS amount,
+               ratio_numerator AS ratio_num,
+               ratio_denominator AS ratio_den
         FROM fact_corporate_action
         WHERE {where}
         ORDER BY ex_date DESC LIMIT 500
@@ -268,4 +316,4 @@ def get_actions(
     for col in ["ex_date", "record_date"]:
         if col in df.columns:
             df[col] = df[col].apply(lambda d: d.isoformat() if hasattr(d, "isoformat") else d)
-    return df.to_dict("records")
+    return _sanitize_api_records(df.to_dict("records"))
