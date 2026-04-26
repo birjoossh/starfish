@@ -587,7 +587,7 @@ class DashboardNotifier(BaseAdapter):
 
 ### Implementation Tasks
 
-#### I.1: Backfill Pipeline (`ingestion/backfill.py`)
+#### I.1: Backfill Pipeline (`ingestion/backfill/orchestrator.py`)
 
 ```python
 """5-year backfill pipeline"""
@@ -796,7 +796,7 @@ beautifulsoup4        # HTML parsing
 - [ ] Tests passing: `pytest tests/ -v -k phase_h`
 
 ### Phase I
-- [ ] `ingestion/backfill.py` implemented
+- [ ] `ingestion/backfill/orchestrator.py` implemented
 - [ ] `ingestion/nse_scraper.py` implemented
 - [ ] `dashboard/phase_i.py` (mobile layout)
 - [ ] Alembic migrations for Phase G/H

@@ -98,13 +98,13 @@ def build_bhavcopy_csv(
 
 
 def build_bhavcopy_csv_bad_headers(tmp_path: Path, trade_date: date = INTG_TEST_DATE) -> Path:
-    """Build a bhavcopy CSV with a missing required header (ISIN removed)."""
-    bad_header = "SYMBOL,SERIES,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,TOTTRDQTY,TOTTRDVAL,TIMESTAMP,TOTALTRADES"
+    """Build a bhavcopy CSV with a missing required header (TOTALTRADES removed)."""
+    bad_header = "SYMBOL,SERIES,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,TOTTRDQTY,TOTTRDVAL,TIMESTAMP,ISIN"
     csv_path = tmp_path / "bad_headers.csv"
     csv_path.write_text(
         bad_header + "\n"
         + f"RELIANCE,EQ,1000,1050,980,1020,1020,1000,5000000,51.00,"
-          f"{trade_date.strftime('%d-%b-%Y').upper()},100000\n"
+          f"{trade_date.strftime('%d-%b-%Y').upper()},INE002A01018\n"
     )
     return csv_path
 

@@ -4,7 +4,7 @@ Main CLI for backfilling historical NSE data.
 Downloads and loads both Bhavcopy and Index prices.
 
 Usage:
-    python -m ingestion.backfill --days 365
+    python -m ingestion.backfill.orchestrator --days 365
 """
 
 import argparse
@@ -38,7 +38,7 @@ class BackfillOrchestrator:
         self.parser = BhavcopyParser()
         self.loader = BhavcopyLoader()
         self.engine = get_engine()
-        
+
     def _get_bhavcopy_cache_path(self, trade_date: date) -> Path:
         """Get expected path for cached bhavcopy CSV."""
         cache_dir = settings.project_root / "data" / "bhavcopy"
@@ -58,81 +58,81 @@ class BackfillOrchestrator:
         if output_dir is None:
             output_dir = settings.project_root / "data" / "index"
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         filename = f"ind_close_all_{trade_date.strftime('%d%m%Y')}.csv"
         url = f"{self.client.base_url}/content/indices/{filename}"
         output_path = output_dir / filename
-        
+
         logger.info(f"Downloading index prices: {url}")
         resp = self.client._request_with_retry(url)
-        
+
         with open(output_path, "wb") as f:
             f.write(resp.content)
-            
+
         return output_path
 
     def parse_and_load_index_csv(self, csv_path: Path, trade_date: date) -> int:
         """Parse index CSV and upsert Nifty 50 close price."""
         try:
             df = pd.read_csv(csv_path)
-            
+
             # Filter for Nifty 50
             if "Index Name" not in df.columns or "Closing Index Value" not in df.columns:
                 logger.warning(f"Invalid index CSV shape in {csv_path}")
                 return 0
-                
+
             nifty_row = df[df["Index Name"].str.upper() == "NIFTY 50"]
             if nifty_row.empty:
                 logger.warning(f"Nifty 50 not found in {csv_path}")
                 return 0
-                
+
             close_price = float(nifty_row.iloc[0]["Closing Index Value"])
-            
+
             upsert_sql = text("""
                 INSERT INTO nifty50_index_prices (trade_date, close)
                 VALUES (:trade_date, :close)
                 ON CONFLICT (trade_date) DO UPDATE SET
                     close = EXCLUDED.close
             """)
-            
+
             with self.engine.connect() as conn:
                 conn.execute(upsert_sql, {
                     "trade_date": trade_date,
                     "close": close_price
                 })
                 conn.commit()
-            
+
             return 1
-            
+
         except Exception as e:
             logger.error(f"Failed to load index data from {csv_path}: {e}")
             return 0
-            
+
     def _is_holiday(self, e: Exception) -> bool:
         """Check if request error is likely due to market holiday."""
         err_str = str(e)
         return "404" in err_str or "Not Found" in err_str
-            
+
     def run(self, start_date: date, end_date: date, skip_index=False, skip_analytics=False):
         """Run backfill orchestration."""
         logger.info(f"Starting backfill from {start_date} to {end_date}")
-        
+
         stats = {
             "days_processed": 0,
             "bhavcopy_loaded": 0,
             "index_loaded": 0,
             "errors": 0
         }
-        
+
         current = end_date
         while current >= start_date:
             if current.weekday() >= 5:  # Skip weekends
                 current -= timedelta(days=1)
                 continue
-                
+
             logger.info(f"Processing date: {current}")
             date_errors = 0
-            
+
             # 1. Bhavcopy
             bhav_path = self._get_bhavcopy_cache_path(current)
             if not bhav_path.exists() and not self.local_dir:
@@ -149,7 +149,7 @@ class BackfillOrchestrator:
                         logger.warning(f"Bhavcopy download failed for {current}: {e}")
                         date_errors += 1
                     bhav_path = None
-                    
+
             if bhav_path and bhav_path.exists():
                 try:
                     df = self.parser.parse(bhav_path, trade_date=current)
@@ -161,7 +161,7 @@ class BackfillOrchestrator:
                 except Exception as e:
                     logger.error(f"Failed to parse/load Bhavcopy for {current}: {e}")
                     date_errors += 1
-            
+
             # 2. Index prices
             if not skip_index:
                 index_path = self._get_index_cache_path(current)
@@ -179,29 +179,29 @@ class BackfillOrchestrator:
                             logger.warning(f"Index download failed for {current}: {e}")
                             date_errors += 1
                         index_path = None
-                
+
                 if index_path and index_path.exists():
                     rows = self.parse_and_load_index_csv(index_path, current)
                     if rows > 0:
                         stats["index_loaded"] += 1
                     else:
                         date_errors += 1
-                        
+
             stats["days_processed"] += 1
             if date_errors > 0:
                 stats["errors"] += 1
-                
+
             # Log progress every 20 days
             if stats["days_processed"] % 20 == 0:
                 logger.info(f"Progress: Processed {stats['days_processed']} days. "
                             f"Bhavcopies loaded: {stats['bhavcopy_loaded']}. "
                             f"Indices loaded: {stats['index_loaded']}")
-                
+
             current -= timedelta(days=1)
-            
+
         logger.info(f"Load complete. Processed {stats['days_processed']} days. "
                     f"Errors on {stats['errors']} days.")
-                    
+
         # 3. Post-load analytics
         if not skip_analytics:
             logger.info("Running post-load analytics (52-week & signals)...")
@@ -222,9 +222,9 @@ def main():
     parser.add_argument("--skip-index", action="store_true", help="Skip index prices")
     parser.add_argument("--skip-analytics", action="store_true", help="Skip post-load analytics")
     parser.add_argument("--local", type=str, help="Local directory with cached CSVs")
-    
+
     args = parser.parse_args()
-    
+
     if args.days:
         end_date = date.today()
         start_date = end_date - timedelta(days=args.days)
@@ -234,12 +234,12 @@ def main():
     else:
         logger.error("Must provide either --days or both --start and --end")
         sys.exit(1)
-        
+
     orchestrator = BackfillOrchestrator(local_dir=args.local)
     orchestrator.run(
-        start_date=start_date, 
-        end_date=end_date, 
-        skip_index=args.skip_index, 
+        start_date=start_date,
+        end_date=end_date,
+        skip_index=args.skip_index,
         skip_analytics=args.skip_analytics
     )
 

@@ -13,9 +13,7 @@ from __future__ import annotations
 
 import logging
 import time
-import zipfile
 from datetime import date, timedelta
-from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
@@ -24,14 +22,6 @@ import requests
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-# Month abbreviation mapping for NSE URL format
-MONTH_ABBR = {
-    1: "JAN", 2: "FEB", 3: "MAR", 4: "APR",
-    5: "MAY", 6: "JUN", 7: "JUL", 8: "AUG",
-    9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC",
-}
-
 
 class CircuitBreakerOpen(Exception):
     """Raised when circuit breaker is open (too many consecutive failures)."""
@@ -139,26 +129,22 @@ class NSEClient:
         )
 
     def _bhavcopy_url(self, trade_date: date) -> str:
-        """Construct NSE bhavcopy ZIP URL for a given date.
+        """Construct NSE bhavcopy CSV URL for a given date.
 
-        Format: https://archives.nseindia.com/content/historical/EQUITIES/YYYY/MON/cmDDMONYYYYbhav.csv.zip
+        Format: https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_DDMMYYYY.csv
         """
-        year = trade_date.strftime("%Y")
-        month = MONTH_ABBR[trade_date.month]
-        day = trade_date.strftime("%d")
-        month_upper = trade_date.strftime("%b").upper()
-        filename = f"cm{day}{month_upper}{year}bhav.csv.zip"
-        return f"{self.base_url}/content/historical/EQUITIES/{year}/{month}/{filename}"
+        date_str = trade_date.strftime("%d%m%Y")
+        return f"https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_{date_str}.csv"
 
     def download_bhavcopy(self, trade_date: date, output_dir: Path | None = None) -> Path:
-        """Download and extract bhavcopy CSV for a given date.
+        """Download bhavcopy CSV for a given date.
 
         Args:
             trade_date: The trading date to download.
-            output_dir: Directory to save extracted CSV. Defaults to project data dir.
+            output_dir: Directory to save CSV. Defaults to project data dir.
 
         Returns:
-            Path to the extracted CSV file.
+            Path to the saved CSV file.
 
         Raises:
             CircuitBreakerOpen: If circuit breaker is tripped.
@@ -173,19 +159,14 @@ class NSEClient:
 
         resp = self._request_with_retry(url)
 
-        # Extract CSV from ZIP
-        with zipfile.ZipFile(BytesIO(resp.content)) as zf:
-            csv_files = [f for f in zf.namelist() if f.endswith(".csv")]
-            if not csv_files:
-                raise ValueError(f"No CSV found in ZIP for {trade_date}")
+        # Save CSV directly (new NSE archives serve CSV, not ZIP)
+        month_upper = trade_date.strftime("%b").upper()
+        output_path = output_dir / f"cm{trade_date.strftime('%d')}{month_upper}{trade_date.year}bhav.csv"
 
-            csv_name = csv_files[0]
-            output_path = output_dir / csv_name
+        with open(output_path, "wb") as f:
+            f.write(resp.content)
 
-            with zf.open(csv_name) as src, open(output_path, "wb") as dst:
-                dst.write(src.read())
-
-        logger.info(f"Extracted: {output_path}")
+        logger.info(f"Saved: {output_path}")
         return output_path
 
     def download_bhavcopy_range(

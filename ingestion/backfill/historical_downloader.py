@@ -6,16 +6,16 @@ Rate-limited to avoid NSE blocking.
 
 Usage:
     # Download last 5 years
-    python -m ingestion.nse_historical_downloader --years 5
+    python -m ingestion.backfill.historical_downloader --years 5
 
     # Download specific date range
-    python -m ingestion.nse_historical_downloader --start 2019-01-01 --end 2024-01-17
+    python -m ingestion.backfill.historical_downloader --start 2019-01-01 --end 2024-01-17
 
     # Resume interrupted download
-    python -m ingestion.nse_historical_downloader --resume
+    python -m ingestion.backfill.historical_downloader --resume
 
     # Check what's missing
-    python -m ingestion.nse_historical_downloader --missing
+    python -m ingestion.backfill.historical_downloader --missing
 """
 
 import argparse

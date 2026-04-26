@@ -108,9 +108,15 @@ class BhavcopyParser:
         # CRITICAL: Validate column headers before parsing
         self._validate_headers(df, file_path)
 
+        # Apply column aliases for new NSE format (2025+) early, before date parsing
+        df = self._apply_column_aliases(df)
+
         # Parse trade date from TIMESTAMP column
         if trade_date is None:
             trade_date = self._parse_trade_date(df, file_path)
+
+        # Strip whitespace from series values (NSE CSVs sometimes have " EQ", " GS", etc.)
+        df["SERIES"] = df["SERIES"].astype(str).str.strip()
 
         # Filter by series
         original_count = len(df)
@@ -169,8 +175,6 @@ class BhavcopyParser:
         missing = required_columns - actual_columns
 
         if missing:
-
-        if missing:
             raise BhavcopyParseError(
                 f"CSV header validation FAILED for {file_path.name}. "
                 f"Missing expected columns: {sorted(missing)}. "
@@ -183,9 +187,9 @@ class BhavcopyParser:
         if "TIMESTAMP" not in df.columns:
             raise BhavcopyParseError(f"No TIMESTAMP column in {file_path}")
 
-        date_str = df["TIMESTAMP"].iloc[0]
+        date_str = str(df["TIMESTAMP"].iloc[0]).strip()
         try:
-            return datetime.strptime(str(date_str), NSE_DATE_FORMAT).date()
+            return datetime.strptime(date_str, NSE_DATE_FORMAT).date()
         except ValueError:
             # Try alternate formats
             for fmt in ("%d-%b-%Y", "%Y-%m-%d", "%d/%m/%Y"):
