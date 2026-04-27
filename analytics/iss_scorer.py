@@ -3,7 +3,9 @@
 Computes a 0-100 score based on 7 technical and momentum factors.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
+import pandas as pd
 
 def compute_iss(row: Dict[str, Any]) -> Dict[str, Any]:
     """Calculate the Investment Signal Score for a given stock row."""
@@ -104,15 +106,33 @@ def compute_iss(row: Dict[str, Any]) -> Dict[str, Any]:
     # -------------------------------------------------------------
     # Factor 5: Corporate Event Presence (Max 10 pts)
     # -------------------------------------------------------------
-    # event_significance is populated by compute_signals.py from fact_corporate_event.
+    # event_significance is populated by compute_signals from the latest past fact_corporate_event.
+    # If there is no recent past event but a significant upcoming event (EVT window), use that
+    # significance for Factor 5 so ISS aligns with EventDriven classification.
     # Scoring:
     #   sig 5 (bonus/split/buyback):   10 pts
     #   sig 4 (rights/large dividend): 8 pts
     #   sig 3 (dividend/results):      5 pts
     #   sig 1-2 (AGM/EGM/other):       2 pts
     #   no event (None or 0):          0 pts
-    event_sig = row.get("event_significance")  # Set by compute_signals from fact_corporate_event
+    event_sig = row.get("event_significance")
     if event_sig is None or event_sig == 0:
+        days_to = row.get("days_to_next_event")
+        next_sig = row.get("next_event_significance")
+        if (
+            days_to is not None
+            and not pd.isna(days_to)
+            and 0 <= float(days_to) <= 10
+            and next_sig is not None
+            and not pd.isna(next_sig)
+            and float(next_sig) >= 3
+        ):
+            event_sig = int(next_sig)
+        else:
+            event_sig = 0
+    if event_sig is None:
+        event_sig = 0
+    if event_sig == 0:
         f5 = 0
     elif event_sig >= 5:
         f5 = 10

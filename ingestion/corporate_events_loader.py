@@ -65,7 +65,11 @@ class CorporateEventsLoader:
             VALUES
                 (:symbol, :event_date, :event_type, :significance,
                  :event_summary, :raw_text, :method)
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (symbol, event_date, event_type) DO UPDATE SET
+                significance_score     = EXCLUDED.significance_score,
+                event_summary          = EXCLUDED.event_summary,
+                raw_announcement_text    = EXCLUDED.raw_announcement_text,
+                categorization_method    = EXCLUDED.categorization_method
         """)
 
         with engine.begin() as conn:

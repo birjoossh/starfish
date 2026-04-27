@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["ingestion*", "analytics*", "api*", "dashboard*", "nifty50*", "config*", "scheduler*"]
+include = ["ingestion*", "analytics*", "api*", "dashboard*", "nifty50*", "config*", "scheduler*", "alerts*"]
 
 [project]
 name = "nifty50-dashboard"
@@ -22,12 +22,14 @@ dependencies = [
     "requests>=2.31.0",
     "streamlit>=1.28.0",
     "scipy>=1.11.0",
+    "beautifulsoup4>=4.12.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
     "httpx>=0.25.0",
 ]
 
@@ -39,6 +41,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
 ]

@@ -5,12 +5,15 @@ Runs the full ingestion pipeline:
 2. Parse with header validation and series filter
 3. Load into fact_eod_price with idempotent upsert
 4. Log the ingestion run
+5. Optional: corporate actions / events CSVs (Phase E), then optional signal recompute
 
 Usage:
     python -m ingestion.daily_run                          # Today's data
     python -m ingestion.daily_run --date 2024-01-15        # Specific date
     python -m ingestion.daily_run --backfill 252           # Last 252 trading days
     python -m ingestion.daily_run --local /path/to/csvs    # Local file source
+    python -m ingestion.daily_run --date 2024-01-17 --corporate-actions data/ca.csv \\
+        --corporate-events data/ann.csv --compute-signals
 """
 
 from __future__ import annotations
@@ -38,6 +41,9 @@ logger = logging.getLogger(__name__)
 def ingest_single_date(
     trade_date: date,
     local_dir: Path | None = None,
+    corporate_actions_csv: Path | None = None,
+    corporate_events_csv: Path | None = None,
+    compute_signals_flag: bool = False,
 ) -> dict:
     """Ingest bhavcopy for a single date.
 
@@ -96,10 +102,43 @@ def ingest_single_date(
     # Load
     stats = loader.load(df, source_file=source_file)
     stats["date"] = str(trade_date)
+
+    if corporate_actions_csv is not None and corporate_actions_csv.exists():
+        from ingestion.corporate_actions_parser import CorporateActionsParser
+        from ingestion.corporate_actions_loader import CorporateActionsLoader
+
+        ca_df = CorporateActionsParser().parse(corporate_actions_csv, as_of=trade_date)
+        stats["corporate_actions_loaded"] = CorporateActionsLoader().load(ca_df)
+    else:
+        stats["corporate_actions_loaded"] = None
+
+    if corporate_events_csv is not None and corporate_events_csv.exists():
+        from ingestion.corporate_events_ingestor import CorporateEventsIngestor
+        from ingestion.corporate_events_loader import CorporateEventsLoader
+
+        ev_df = CorporateEventsIngestor().ingest(corporate_events_csv, calc_date=trade_date)
+        stats["corporate_events_loaded"] = CorporateEventsLoader().load(ev_df)
+    else:
+        stats["corporate_events_loaded"] = None
+
+    if compute_signals_flag:
+        from analytics.compute_signals import compute_signals as run_compute_signals
+
+        stats["signals_rows"] = run_compute_signals(trade_date)
+    else:
+        stats["signals_rows"] = None
+
     return stats
 
 
-def backfill(start_date: date, end_date: date, local_dir: Path | None = None) -> list[dict]:
+def backfill(
+    start_date: date,
+    end_date: date,
+    local_dir: Path | None = None,
+    corporate_actions_csv: Path | None = None,
+    corporate_events_csv: Path | None = None,
+    compute_signals_flag: bool = False,
+) -> list[dict]:
     """Backfill a date range.
 
     For NSE downloads, uses the client's range method for rate limiting.
@@ -110,7 +149,13 @@ def backfill(start_date: date, end_date: date, local_dir: Path | None = None) ->
 
     while current <= end_date:
         if current.weekday() < 5:  # Skip weekends
-            stats = ingest_single_date(current, local_dir)
+            stats = ingest_single_date(
+                current,
+                local_dir,
+                corporate_actions_csv=corporate_actions_csv,
+                corporate_events_csv=corporate_events_csv,
+                compute_signals_flag=compute_signals_flag,
+            )
             results.append(stats)
             logger.info(f"[{current}] {stats['status']}: {stats.get('rows_inserted', 0)} rows")
         current += timedelta(days=1)
@@ -127,28 +172,72 @@ def main():
     parser.add_argument("--start", type=str, help="Backfill start date (YYYY-MM-DD)")
     parser.add_argument("--end", type=str, help="Backfill end date (YYYY-MM-DD)")
     parser.add_argument("--local", type=str, help="Local CSV directory (overrides NSE download)")
+    parser.add_argument(
+        "--corporate-actions",
+        type=str,
+        help="Path to NSE corporate actions CSV (loaded after bhavcopy for this date)",
+    )
+    parser.add_argument(
+        "--corporate-events",
+        type=str,
+        help="Path to announcements CSV for fact_corporate_event (fixture-friendly)",
+    )
+    parser.add_argument(
+        "--compute-signals",
+        action="store_true",
+        help="Run analytics.compute_signals for the trade date after ingestion",
+    )
 
     args = parser.parse_args()
     local_dir = Path(args.local) if args.local else None
+    corp_act = Path(args.corporate_actions) if args.corporate_actions else None
+    corp_ev = Path(args.corporate_events) if args.corporate_events else None
+    do_signals = bool(args.compute_signals)
 
     if args.date:
         trade_date = date.fromisoformat(args.date)
-        stats = ingest_single_date(trade_date, local_dir)
+        stats = ingest_single_date(
+            trade_date,
+            local_dir,
+            corporate_actions_csv=corp_act,
+            corporate_events_csv=corp_ev,
+            compute_signals_flag=do_signals,
+        )
         print(f"Result: {stats}")
 
     elif args.backfill:
         end_date = date.today()
         start_date = end_date - timedelta(days=args.backfill)
-        backfill(start_date, end_date, local_dir)
+        backfill(
+            start_date,
+            end_date,
+            local_dir,
+            corporate_actions_csv=corp_act,
+            corporate_events_csv=corp_ev,
+            compute_signals_flag=do_signals,
+        )
 
     elif args.start and args.end:
         start_date = date.fromisoformat(args.start)
         end_date = date.fromisoformat(args.end)
-        backfill(start_date, end_date, local_dir)
+        backfill(
+            start_date,
+            end_date,
+            local_dir,
+            corporate_actions_csv=corp_act,
+            corporate_events_csv=corp_ev,
+            compute_signals_flag=do_signals,
+        )
 
     else:
         # Default: today
-        stats = ingest_single_date(date.today(), local_dir)
+        stats = ingest_single_date(
+            date.today(),
+            local_dir,
+            corporate_actions_csv=corp_act,
+            corporate_events_csv=corp_ev,
+            compute_signals_flag=do_signals,
+        )
         print(f"Result: {stats}")
 
 

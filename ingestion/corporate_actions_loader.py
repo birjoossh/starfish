@@ -52,6 +52,22 @@ class CorporateActionsLoader:
             return 0
 
         engine = get_engine()
+
+        # Fetch allowed symbols from dim_stock to prevent FK violations
+        with engine.connect() as conn:
+            valid_symbols = set(row[0] for row in conn.execute(text("SELECT symbol FROM dim_stock")))
+
+        original_count = len(df)
+        df = df[df["symbol"].isin(valid_symbols)].copy()
+        logger.info(
+            "Filtered corporate actions to %d rows matching dim_stock (from %d total)",
+            len(df), original_count
+        )
+
+        if df.empty:
+            logger.warning("No corporate actions remaining after dim_stock filter. Nothing to load.")
+            return 0
+
         rows_upserted = 0
 
         upsert_sql = text("""
