@@ -130,3 +130,43 @@ class TestWk52Loader:
 
         with pytest.raises(Wk52ParseError, match="empty"):
             Wk52Loader(engine=MagicMock())._parse(csv, trade_date=date(2099, 1, 15))
+
+
+from ingestion.framework.loaders.constituents_loader import (
+    ConstituentsLoader, ConstituentsParseError
+)
+
+
+class TestConstituentsLoader:
+    _SAMPLE_CSV = (
+        "Company Name,Industry,Symbol,Series,ISIN Code\n"
+        "Reliance Industries Limited,ENERGY,RELIANCE,EQ,INE002A01018\n"
+        "HDFC Bank Limited,FINANCIAL SERVICES,HDFCBANK,EQ,INE040A01034\n"
+    )
+
+    def test_parse_returns_dataframe(self, tmp_path):
+        """ConstituentsLoader._parse() returns a DataFrame with symbol column."""
+        csv = tmp_path / "ind_nifty50list.csv"
+        csv.write_text(self._SAMPLE_CSV)
+
+        loader = ConstituentsLoader(engine=MagicMock())
+        df = loader._parse(csv)
+
+        assert "symbol" in df.columns
+        assert set(df["symbol"]) == {"RELIANCE", "HDFCBANK"}
+
+    def test_parse_raises_on_missing_symbol_column(self, tmp_path):
+        """ConstituentsLoader._parse() raises on CSV without a symbol column."""
+        csv = tmp_path / "bad.csv"
+        csv.write_text("Company Name,Industry\nFoo,Bar\n")
+
+        with pytest.raises(ConstituentsParseError, match="symbol"):
+            ConstituentsLoader(engine=MagicMock())._parse(csv)
+
+    def test_parse_raises_on_empty_file(self, tmp_path):
+        """ConstituentsLoader._parse() raises on empty CSV."""
+        csv = tmp_path / "empty.csv"
+        csv.write_text("Company Name,Industry,Symbol,Series,ISIN Code\n")
+
+        with pytest.raises(ConstituentsParseError, match="empty"):
+            ConstituentsLoader(engine=MagicMock())._parse(csv)
