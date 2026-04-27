@@ -74,3 +74,50 @@ class TestLocalFetcher:
         fetcher = LocalFetcher(source_dir=tmp_path)
         result = fetcher.fetch(trade_date)
         assert result == expected
+
+
+from ingestion.framework.fetchers.http_fetcher import NseHttpFetcher, SourceType
+
+
+class TestNseHttpFetcher:
+    def test_bhavcopy_delegates_to_nse_client(self, tmp_path):
+        """NseHttpFetcher.fetch() for BHAVCOPY calls NSEClient.download_bhavcopy."""
+        mock_client = MagicMock()
+        mock_client.download_bhavcopy.return_value = tmp_path / "bhav.csv"
+        (tmp_path / "bhav.csv").write_text("x")
+
+        fetcher = NseHttpFetcher(source=SourceType.BHAVCOPY, client=mock_client)
+        result = fetcher.fetch(date(2099, 1, 15))
+
+        mock_client.download_bhavcopy.assert_called_once_with(
+            date(2099, 1, 15), output_dir=None
+        )
+        assert result == tmp_path / "bhav.csv"
+
+    def test_raises_fetch_error_on_circuit_breaker(self, tmp_path):
+        """NseHttpFetcher wraps CircuitBreakerOpen as FetchError."""
+        from ingestion.nse_client import CircuitBreakerOpen
+
+        mock_client = MagicMock()
+        mock_client.download_bhavcopy.side_effect = CircuitBreakerOpen("open")
+
+        fetcher = NseHttpFetcher(source=SourceType.BHAVCOPY, client=mock_client)
+        with pytest.raises(FetchError, match="Circuit breaker"):
+            fetcher.fetch(date(2099, 1, 15))
+
+    def test_raises_fetch_error_on_request_exception(self, tmp_path):
+        """NseHttpFetcher wraps requests.RequestException as FetchError."""
+        import requests
+
+        mock_client = MagicMock()
+        mock_client.download_bhavcopy.side_effect = requests.RequestException("timeout")
+
+        fetcher = NseHttpFetcher(source=SourceType.BHAVCOPY, client=mock_client)
+        with pytest.raises(FetchError, match="HTTP download failed"):
+            fetcher.fetch(date(2099, 1, 15))
+
+    def test_source_type_enum_has_all_sources(self):
+        """SourceType must cover all automated sources (A, B, C, E, F, G)."""
+        expected = {"BHAVCOPY", "WK52", "CONSTITUENTS", "CORPORATE_ACTIONS",
+                    "EVENT_CALENDAR", "ANNOUNCEMENTS"}
+        assert expected.issubset({s.name for s in SourceType})
