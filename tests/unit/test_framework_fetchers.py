@@ -121,3 +121,58 @@ class TestNseHttpFetcher:
         expected = {"BHAVCOPY", "WK52", "CONSTITUENTS", "CORPORATE_ACTIONS",
                     "EVENT_CALENDAR", "ANNOUNCEMENTS"}
         assert expected.issubset({s.name for s in SourceType})
+
+
+from ingestion.framework.fetchers.hybrid_fetcher import HybridFetcher
+
+
+class TestHybridFetcher:
+    def test_uses_http_when_available(self, tmp_path):
+        """HybridFetcher returns HTTP result when HTTP succeeds."""
+        http_path = tmp_path / "http_result.csv"
+        http_path.write_text("x")
+
+        http_mock = MagicMock()
+        http_mock.fetch.return_value = http_path
+        local_mock = MagicMock()
+
+        fetcher = HybridFetcher(http=http_mock, local=local_mock)
+        result = fetcher.fetch(date(2099, 1, 15))
+
+        assert result == http_path
+        local_mock.fetch.assert_not_called()
+
+    def test_falls_back_to_local_on_http_failure(self, tmp_path):
+        """HybridFetcher uses local fallback when HTTP raises FetchError."""
+        local_path = tmp_path / "local_result.csv"
+        local_path.write_text("y")
+
+        http_mock = MagicMock()
+        http_mock.fetch.side_effect = FetchError("HTTP down")
+        local_mock = MagicMock()
+        local_mock.fetch.return_value = local_path
+
+        fetcher = HybridFetcher(http=http_mock, local=local_mock)
+        result = fetcher.fetch(date(2099, 1, 15))
+
+        assert result == local_path
+
+    def test_raises_fetch_error_when_both_fail(self, tmp_path):
+        """HybridFetcher raises FetchError when both HTTP and local fail."""
+        http_mock = MagicMock()
+        http_mock.fetch.side_effect = FetchError("HTTP down")
+        local_mock = MagicMock()
+        local_mock.fetch.side_effect = FetchError("No local file")
+
+        fetcher = HybridFetcher(http=http_mock, local=local_mock)
+        with pytest.raises(FetchError, match="No local file"):
+            fetcher.fetch(date(2099, 1, 15))
+
+    def test_http_non_fetch_error_propagates(self, tmp_path):
+        """Unexpected exceptions from HTTP are not swallowed."""
+        http_mock = MagicMock()
+        http_mock.fetch.side_effect = RuntimeError("unexpected")
+
+        fetcher = HybridFetcher(http=http_mock, local=MagicMock())
+        with pytest.raises(RuntimeError, match="unexpected"):
+            fetcher.fetch(date(2099, 1, 15))
