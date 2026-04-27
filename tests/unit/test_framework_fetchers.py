@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ingestion.framework.fetchers.base import BaseFetcher, FetchError
+from ingestion.framework.fetchers.local_fetcher import LocalFetcher
 
 
 class TestBaseFetcherABC:
@@ -39,3 +40,37 @@ class TestBaseFetcherABC:
         err = FetchError("something went wrong")
         assert isinstance(err, Exception)
         assert str(err) == "something went wrong"
+
+
+class TestLocalFetcher:
+    def test_finds_file_by_date_pattern(self, tmp_path):
+        """LocalFetcher returns path when a matching file exists."""
+        trade_date = date(2099, 1, 15)
+        expected = tmp_path / "sec_bhavdata_full_15012099.csv"
+        expected.write_text("SYMBOL,SERIES\n")
+
+        fetcher = LocalFetcher(source_dir=tmp_path)
+        result = fetcher.fetch(trade_date)
+        assert result == expected
+
+    def test_raises_fetch_error_when_missing(self, tmp_path):
+        """LocalFetcher raises FetchError when no file matches the date."""
+        fetcher = LocalFetcher(source_dir=tmp_path)
+        with pytest.raises(FetchError, match="No file found for 2099-01-15"):
+            fetcher.fetch(date(2099, 1, 15))
+
+    def test_raises_fetch_error_for_missing_directory(self, tmp_path):
+        """LocalFetcher raises FetchError if the source_dir does not exist."""
+        non_existent = tmp_path / "does_not_exist"
+        with pytest.raises(FetchError, match="does not exist"):
+            LocalFetcher(source_dir=non_existent)
+
+    def test_finds_file_by_nse_bhavcopy_naming(self, tmp_path):
+        """LocalFetcher also matches NSE legacy bhavcopy naming cmDDMONYYYYbhav.csv."""
+        trade_date = date(2099, 3, 5)
+        expected = tmp_path / "cm05MAR2099bhav.csv"
+        expected.write_text("SYMBOL,SERIES\n")
+
+        fetcher = LocalFetcher(source_dir=tmp_path)
+        result = fetcher.fetch(trade_date)
+        assert result == expected
