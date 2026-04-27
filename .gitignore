@@ -156,7 +156,11 @@ cython_debug/
 *.db
 *.csv
 !tests/fixtures/*.csv
-/data/
+/data/*
+!/data/raw/
+/data/raw/**/*
+!/data/raw/**/
+!/data/raw/**/.gitkeep
 .logs/
 .pids/
 
