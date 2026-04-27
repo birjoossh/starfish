@@ -75,3 +75,58 @@ class TestEodPriceLoader:
         loader = EodPriceLoader(parser=mock_parser, bhavcopy_loader=mock_bloader)
         result = loader.load(Path("/fake.csv"), date(2099, 1, 15))
         assert result == 37
+
+
+from ingestion.framework.loaders.wk52_loader import Wk52Loader, Wk52ParseError
+
+
+class TestWk52Loader:
+    _SAMPLE_CSV_CONTENT = (
+        "SYMBOL,SERIES,HIGH,HIGH_DATE,LOW,LOW_DATE\n"
+        "RELIANCE,EQ,3215.00,29-DEC-2098,2180.10,05-APR-2098\n"
+        "HDFCBANK,EQ,1850.00,10-NOV-2098,1200.50,12-JAN-2098\n"
+    )
+
+    def test_parse_returns_dataframe_with_required_columns(self, tmp_path):
+        """Wk52Loader._parse() returns DataFrame with all required columns."""
+        csv = tmp_path / "CM_52_wk_High_low_15012099.csv"
+        csv.write_text(self._SAMPLE_CSV_CONTENT)
+
+        loader = Wk52Loader(engine=MagicMock())
+        df = loader._parse(csv, trade_date=date(2099, 1, 15))
+
+        required = {"symbol", "trade_date", "wk52_high", "wk52_low",
+                    "wk52_high_date", "wk52_low_date"}
+        assert required.issubset(set(df.columns))
+        assert len(df) == 2
+
+    def test_parse_extracts_correct_values(self, tmp_path):
+        """Wk52Loader._parse() correctly parses prices and dates."""
+        csv = tmp_path / "CM_52_wk_High_low_15012099.csv"
+        csv.write_text(self._SAMPLE_CSV_CONTENT)
+
+        loader = Wk52Loader(engine=MagicMock())
+        df = loader._parse(csv, trade_date=date(2099, 1, 15))
+        row = df[df["symbol"] == "RELIANCE"].iloc[0]
+
+        assert float(row["wk52_high"]) == 3215.00
+        assert float(row["wk52_low"]) == 2180.10
+        assert row["wk52_high_date"] == date(2098, 12, 29)
+        assert row["wk52_low_date"] == date(2098, 4, 5)
+        assert row["trade_date"] == date(2099, 1, 15)
+
+    def test_parse_raises_on_missing_columns(self, tmp_path):
+        """Wk52Loader._parse() raises Wk52ParseError on missing columns."""
+        csv = tmp_path / "bad.csv"
+        csv.write_text("SYMBOL,SERIES\nRELIANCE,EQ\n")
+
+        with pytest.raises(Wk52ParseError, match="Missing columns"):
+            Wk52Loader(engine=MagicMock())._parse(csv, trade_date=date(2099, 1, 15))
+
+    def test_parse_raises_on_empty_file(self, tmp_path):
+        """Wk52Loader._parse() raises Wk52ParseError on empty CSV."""
+        csv = tmp_path / "empty.csv"
+        csv.write_text("SYMBOL,SERIES,HIGH,HIGH_DATE,LOW,LOW_DATE\n")
+
+        with pytest.raises(Wk52ParseError, match="empty"):
+            Wk52Loader(engine=MagicMock())._parse(csv, trade_date=date(2099, 1, 15))
