@@ -170,3 +170,72 @@ class TestConstituentsLoader:
 
         with pytest.raises(ConstituentsParseError, match="empty"):
             ConstituentsLoader(engine=MagicMock())._parse(csv)
+
+
+from ingestion.framework.loaders.reconstitution_loader import ReconstitutionLoader
+from ingestion.framework.loaders.intraday_loader import IntradayLoader
+from ingestion.framework.loaders.corporate_actions_loader import CorporateActionsFrameworkLoader
+from ingestion.framework.loaders.event_calendar_loader import EventCalendarLoader
+from ingestion.framework.loaders.announcements_loader import AnnouncementsLoader
+
+
+class TestPlaceholderLoaders:
+    def test_intraday_loader_raises_not_implemented(self, tmp_path):
+        """IntradayLoader.load() raises NotImplementedError."""
+        loader = IntradayLoader()
+        with pytest.raises(NotImplementedError, match="vendor"):
+            loader.load(tmp_path / "fake.csv", date(2099, 1, 15))
+
+    def test_reconstitution_loader_raises_fetch_error_on_missing_file(self, tmp_path):
+        """ReconstitutionLoader.load() raises when file doesn't exist."""
+        loader = ReconstitutionLoader(engine=MagicMock())
+        with pytest.raises(FileNotFoundError):
+            loader.load(tmp_path / "nonexistent.csv", date(2099, 1, 15))
+
+
+class TestCorporateActionsWrapper:
+    def test_delegates_to_existing_parser_and_loader(self, tmp_path):
+        """CorporateActionsFrameworkLoader delegates to existing chain."""
+        import pandas as pd
+        mock_parser = MagicMock()
+        mock_parser.parse.return_value = pd.DataFrame()
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = 5
+
+        loader = CorporateActionsFrameworkLoader(
+            parser=mock_parser, ca_loader=mock_loader
+        )
+        result = loader.load(tmp_path / "ca.csv", date(2099, 1, 15))
+
+        assert result == 5
+        mock_parser.parse.assert_called_once()
+
+
+class TestEventCalendarWrapper:
+    def test_delegates_to_existing_scraper_chain(self, tmp_path):
+        """EventCalendarLoader delegates to existing ingestor+loader chain."""
+        import pandas as pd
+        mock_ingestor = MagicMock()
+        mock_ingestor.ingest.return_value = pd.DataFrame()
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = 3
+
+        loader = EventCalendarLoader(ingestor=mock_ingestor, events_loader=mock_loader)
+        result = loader.load(tmp_path / "ec.json", date(2099, 1, 15))
+
+        assert result == 3
+        mock_ingestor.ingest.assert_called_once()
+
+
+class TestAnnouncementsWrapper:
+    def test_delegates_to_existing_scraper_chain(self, tmp_path):
+        """AnnouncementsLoader delegates to existing ingestor+loader chain."""
+        import pandas as pd
+        mock_ingestor = MagicMock()
+        mock_ingestor.ingest.return_value = pd.DataFrame()
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = 7
+
+        loader = AnnouncementsLoader(ingestor=mock_ingestor, events_loader=mock_loader)
+        result = loader.load(tmp_path / "ann.json", date(2099, 1, 15))
+        assert result == 7
