@@ -30,16 +30,26 @@ logger = logging.getLogger(__name__)
 
 _NSE_DATE_FORMATS = ["%d-%b-%Y", "%d/%m/%Y", "%Y-%m-%d"]
 
-# Column aliases: NSE may vary capitalisation
+# Column aliases: NSE varies header naming across formats.
+# - Legacy:  HIGH / LOW / HIGH_DATE / LOW_DATE
+# - 2025+:   ADJUSTED_52_WEEK_HIGH / 52_WEEK_HIGH_DATE / ADJUSTED_52_WEEK_LOW / 52_WEEK_LOW_DT
 _COL_ALIASES = {
     "52W HIGH": "HIGH",
     "52W_HIGH": "HIGH",
     "HIGH PRICE": "HIGH",
+    "ADJUSTED_52_WEEK_HIGH": "HIGH",
+    "52_WEEK_HIGH": "HIGH",
     "52W LOW": "LOW",
     "52W_LOW": "LOW",
     "LOW PRICE": "LOW",
+    "ADJUSTED_52_WEEK_LOW": "LOW",
+    "52_WEEK_LOW": "LOW",
     "HIGH DATE": "HIGH_DATE",
+    "52_WEEK_HIGH_DATE": "HIGH_DATE",
     "LOW DATE": "LOW_DATE",
+    "52_WEEK_LOW_DATE": "LOW_DATE",
+    "52_WEEK_LOW_DT": "LOW_DATE",
+    "52_WEEK_HIGH_DT": "HIGH_DATE",
 }
 
 
@@ -73,6 +83,34 @@ class Wk52Loader(BaseLoader):
         logger.info("Wk52Loader: upserted %d rows for %s", rows, trade_date)
         return rows
 
+    @staticmethod
+    def _detect_header_row(path: Path) -> int:
+        """Find the line number of the real header row.
+
+        NSE's ``CM_52_wk_High_low_DDMMYYYY.csv`` may be preceded by 0..N
+        banner rows (disclaimer, "Effective for ..."). The real header row
+        is the first one that mentions ``SYMBOL`` (case-insensitive).
+
+        Args:
+            path: Path to the CSV.
+
+        Returns:
+            Zero-based line index suitable for ``pd.read_csv(skiprows=...)``.
+
+        Raises:
+            Wk52ParseError: If no header row is found in the first 20 lines.
+        """
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            for idx, line in enumerate(fh):
+                if idx > 20:
+                    break
+                stripped = line.strip().strip('"').upper()
+                if stripped.startswith("SYMBOL"):
+                    return idx
+        raise Wk52ParseError(
+            f"Could not locate header row (no 'SYMBOL' in first 20 lines) in {path.name}"
+        )
+
     def _parse(self, path: Path, trade_date: date) -> pd.DataFrame:
         """Parse the CSV into a clean DataFrame.
 
@@ -87,14 +125,18 @@ class Wk52Loader(BaseLoader):
         Raises:
             Wk52ParseError: On missing columns or empty file.
         """
+        # NSE's real CSV has 0..N banner rows (disclaimer + "Effective for ...")
+        # before the header row. Detect the header row by scanning for "SYMBOL".
         try:
-            raw = pd.read_csv(path, dtype=str)
+            header_row = self._detect_header_row(path)
+            # ``-`` is NSE's marker for "no data" — treat as NaN so dropna works.
+            raw = pd.read_csv(path, dtype=str, skiprows=header_row, na_values=["-"])
         except Exception as exc:
             raise Wk52ParseError(f"Cannot read {path}: {exc}") from exc
 
         raw.columns = raw.columns.str.strip().str.upper()
 
-        # Apply column aliases
+        # Apply column aliases (handles both legacy and 2025+ NSE headers).
         raw.rename(columns=_COL_ALIASES, inplace=True)
 
         required = {"SYMBOL", "HIGH", "HIGH_DATE", "LOW", "LOW_DATE"}

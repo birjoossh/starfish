@@ -131,6 +131,37 @@ class TestWk52Loader:
         with pytest.raises(Wk52ParseError, match="empty"):
             Wk52Loader(engine=MagicMock())._parse(csv, trade_date=date(2099, 1, 15))
 
+    def test_parse_handles_real_nse_format_with_banner_rows(self, tmp_path):
+        """Wk52Loader._parse() handles the real NSE file with banner rows.
+
+        NSE's actual ``CM_52_wk_High_low_DDMMYYYY.csv`` has:
+          1. A disclaimer line.
+          2. An "Effective for DD-Mon-YYYY" line.
+          3. The real header: SYMBOL, SERIES, Adjusted_52_Week_High,
+             52_Week_High_Date, Adjusted_52_Week_Low, 52_Week_Low_DT.
+        Values may include leading whitespace and ``-`` for missing data.
+        """
+        csv = tmp_path / "CM_52_wk_High_low_27042026.csv"
+        csv.write_text(
+            '"Disclaimer - The Data provided in the adjusted 52 week high..."\n'
+            '"Effective for 27-Apr-2026"\n'
+            '"SYMBOL","SERIES","Adjusted_52_Week_High","52_Week_High_Date",'
+            '"Adjusted_52_Week_Low","52_Week_Low_DT"\n'
+            '"RELIANCE","EQ","   3215.00","29-DEC-2025","   2180.10","05-APR-2025"\n'
+            '"HDFCBANK","EQ","   1850.00","10-NOV-2025","   1200.50","12-JAN-2025"\n'
+            '"DELISTED$","EQ","-","-","-","-"\n'
+        )
+
+        loader = Wk52Loader(engine=MagicMock())
+        df = loader._parse(csv, trade_date=date(2026, 4, 27))
+
+        # Two valid rows; the "-" row is dropped
+        assert set(df["symbol"]) == {"RELIANCE", "HDFCBANK"}
+        rel = df[df["symbol"] == "RELIANCE"].iloc[0]
+        assert float(rel["wk52_high"]) == 3215.00
+        assert rel["wk52_high_date"] == date(2025, 12, 29)
+        assert rel["wk52_low_date"] == date(2025, 4, 5)
+
 
 from ingestion.framework.loaders.constituents_loader import (
     ConstituentsLoader, ConstituentsParseError
