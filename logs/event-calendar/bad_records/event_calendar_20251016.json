@@ -1,0 +1,18 @@
+[
+  {
+    "symbol": "INDUSINVIT",
+    "company": "Indus Infra Trust",
+    "purpose": "Financial Results/Other business matters",
+    "bm_desc": "To consider and approve the financial information for the period ended March 31, 2026 and declaration of distribution for Q4-FY26.",
+    "date": "29-Apr-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  },
+  {
+    "symbol": "MINDSPACE",
+    "company": "Mindspace Business Parks REIT",
+    "purpose": "Financial Results/Other business matters",
+    "bm_desc": "Prior Intimation of the meeting of the Board of Directors of K Raheja Corp Investment Managers Private Limited (acting as the Manager to Mindspace Business Parks REIT) for the quarter and financial year ended March 31, 2026, scheduled to be held on Wednesday, April 29, 2026 and the Conference Call thereto",
+    "date": "29-Apr-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  }
+]

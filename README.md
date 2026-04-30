@@ -122,6 +122,10 @@ python -m ingestion.framework.run_pipeline --source all --date 2024-01-15 \
 # Skip HTTP — read only from the manual-drop folder data/raw/<source>/
 python -m ingestion.framework.run_pipeline --source bhavcopy --local-only
 
+# Load a SPECIFIC file (bypasses both HTTP and data/raw/<source>/ lookup)
+python -m ingestion.framework.run_pipeline --source dim-stock \
+    --date 2026-04-27 --local-file /path/to/NSE_CM_security_27042026.csv
+
 # Backfill a date range (skips weekends, idempotent upserts)
 python -m ingestion.framework.run_pipeline --source bhavcopy \
     --start 2024-01-01 --end 2024-01-31
@@ -135,6 +139,7 @@ Available `--source` values:
 
 | Source | Spec section | Target table |
 |---|---|---|
+| `dim-stock` | J | `dim_stock` (NSE security master, gzipped CSV) |
 | `bhavcopy` | A | `fact_eod_price` |
 | `wk52` | B | `fact_52wk` |
 | `constituents` | C | `dim_nifty50_constituent` |
@@ -143,16 +148,37 @@ Available `--source` values:
 | `event-calendar` | F | `fact_corporate_event` |
 | `announcements` | G | `fact_corporate_event` |
 | `intraday` | H | placeholder — skipped (vendor pending) |
-| `all` | A+B+C+E+F+G | runs the six automated sources in order |
+| `all` | J+A+B+C+E+F+G | runs the seven automated sources in order |
 
 **Local-drop folders** (used by `LocalFetcher` fallback when HTTP fails, and required for source D):
 
 ```
-data/raw/bhavcopy/           data/raw/52wk/
-data/raw/constituents/       data/raw/reconstitution/
-data/raw/corporate_actions/  data/raw/event_calendar/
-data/raw/announcements/
+data/raw/dim_stock/          data/raw/bhavcopy/
+data/raw/52wk/               data/raw/constituents/
+data/raw/reconstitution/     data/raw/corporate_actions/
+data/raw/event_calendar/     data/raw/announcements/
 ```
+
+**Per-source filename templates** are declared in `SOURCES` (`run_pipeline.py`).
+The `LocalFetcher` only looks for files matching its own source's templates,
+so e.g. `--source dim-stock` will *only* match `NSE_CM_security_DDMMYYYY.csv`
+and never pick up a stray bhavcopy file.
+
+**File lifecycle:**
+
+```
+data/raw/<source>/<file>     ← drop here (or HTTP downloads here)
+        │
+        ▼  Pipeline.run() succeeds
+data/processed/<source>/<file>   ← auto-archived after successful upsert
+
+logs/<source>/bad_records/<file>.csv   ← rows dropped during parsing
+                                         (with a _drop_reason column)
+```
+
+On failure, the source file stays in `data/raw/` for inspection.
+On a re-run that produces a name collision in `data/processed/`, the new file
+is suffixed with the trade date (`<stem>.<YYYY-MM-DD>.<ext>`).
 
 Every pipeline run writes a row to `ingestion_log` (success or failure). On failure the exception bubbles to the CLI for a non-zero exit code, unless `--continue-on-error` is passed.
 

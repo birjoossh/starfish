@@ -24,6 +24,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from config.database import get_engine
+from ingestion.framework.bad_records import BadRecordsWriter
 from ingestion.framework.loaders.base import BaseLoader
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,17 @@ class Wk52Loader(BaseLoader):
 
     Args:
         engine: Optional SQLAlchemy engine (injected for testing).
+        bad_records_writer: Optional :class:`BadRecordsWriter` to capture
+            rows dropped during parsing (missing symbol, prices, or dates).
     """
 
-    def __init__(self, engine=None) -> None:
+    def __init__(
+        self,
+        engine=None,
+        bad_records_writer: Optional[BadRecordsWriter] = None,
+    ) -> None:
         self._engine = engine or get_engine()
+        self._bad_records = bad_records_writer
 
     def load(self, path: Path, trade_date: date) -> int:
         """Parse *path* and upsert 52-week records for *trade_date*.
@@ -134,7 +142,17 @@ class Wk52Loader(BaseLoader):
         except Exception as exc:
             raise Wk52ParseError(f"Cannot read {path}: {exc}") from exc
 
-        raw.columns = raw.columns.str.strip().str.upper()
+        # Normalise headers: strip, uppercase, then collapse any run of
+        # whitespace and/or underscores to a single underscore. NSE has been
+        # observed to publish the *same* logical column under several
+        # spellings ("ADJUSTED_52_WEEK_HIGH" vs "ADJUSTED 52_WEEK_HIGH" vs
+        # "Adjusted 52 Week High"); after normalisation they all collapse
+        # to the canonical "ADJUSTED_52_WEEK_HIGH" key in _COL_ALIASES.
+        raw.columns = (
+            raw.columns.str.strip()
+                       .str.upper()
+                       .str.replace(r"[_\s]+", "_", regex=True)
+        )
 
         # Apply column aliases (handles both legacy and 2025+ NSE headers).
         raw.rename(columns=_COL_ALIASES, inplace=True)
@@ -176,8 +194,21 @@ class Wk52Loader(BaseLoader):
             "pct_from_low": 0.0,
         })
 
-        df = df.dropna(subset=["symbol", "wk52_high", "wk52_low",
-                                "wk52_high_date", "wk52_low_date"])
+        required = ["symbol", "wk52_high", "wk52_low",
+                    "wk52_high_date", "wk52_low_date"]
+        bad_mask = df[required].isna().any(axis=1)
+        bad = df[bad_mask]
+        df = df[~bad_mask]
+        if not bad.empty:
+            logger.warning(
+                "Wk52Loader: dropped %d rows missing required fields", len(bad),
+            )
+            if self._bad_records is not None:
+                self._bad_records.write(
+                    bad,
+                    original_filename=path.name,
+                    reason="missing required field",
+                )
         return df.reset_index(drop=True)
 
     def _enrich_pct_columns(self, df: pd.DataFrame, trade_date: date) -> pd.DataFrame:
