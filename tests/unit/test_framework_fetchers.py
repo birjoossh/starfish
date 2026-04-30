@@ -8,7 +8,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from ingestion.framework.fetchers.base import BaseFetcher, FetchError
-from ingestion.framework.fetchers.local_fetcher import LocalFetcher
+from ingestion.framework.fetchers.local_fetcher import (
+    FixedFileFetcher, LocalFetcher,
+)
 
 
 class TestBaseFetcherABC:
@@ -65,6 +67,33 @@ class TestLocalFetcher:
         with pytest.raises(FetchError, match="does not exist"):
             LocalFetcher(source_dir=non_existent)
 
+    def test_uses_only_supplied_patterns_when_given(self, tmp_path):
+        """LocalFetcher with explicit patterns must NOT match other source files.
+
+        Regression: previously a single broad pattern list was used for every
+        source, so ``--source dim-stock`` would happily pick up a stray
+        bhavcopy file. Source-specific patterns prevent that cross-match.
+        """
+        # Drop a bhavcopy-named file in a dim_stock-style folder
+        (tmp_path / "sec_bhavdata_full_15012099.csv").write_text("x")
+
+        fetcher = LocalFetcher(
+            source_dir=tmp_path,
+            patterns=("NSE_CM_security_{ddmmyyyy}.csv",),
+        )
+        with pytest.raises(FetchError, match="No file found"):
+            fetcher.fetch(date(2099, 1, 15))
+
+    def test_substitutes_yyyymmdd_and_ddmonyyyy_placeholders(self, tmp_path):
+        """LocalFetcher resolves all three date placeholders correctly."""
+        (tmp_path / "report_20990115.json").write_text("x")
+        f1 = LocalFetcher(tmp_path, patterns=("report_{yyyymmdd}.json",))
+        assert f1.fetch(date(2099, 1, 15)).name == "report_20990115.json"
+
+        (tmp_path / "cm15JAN2099bhav.csv").write_text("x")
+        f2 = LocalFetcher(tmp_path, patterns=("cm{ddmonyyyy}bhav.csv",))
+        assert f2.fetch(date(2099, 1, 15)).name == "cm15JAN2099bhav.csv"
+
     def test_finds_file_by_nse_bhavcopy_naming(self, tmp_path):
         """LocalFetcher also matches NSE legacy bhavcopy naming cmDDMONYYYYbhav.csv."""
         trade_date = date(2099, 3, 5)
@@ -77,6 +106,27 @@ class TestLocalFetcher:
 
 
 from ingestion.framework.fetchers.http_fetcher import NseHttpFetcher, SourceType
+
+
+class TestFixedFileFetcher:
+    def test_returns_supplied_path_regardless_of_date(self, tmp_path):
+        """FixedFileFetcher returns the same path for any trade_date."""
+        f = tmp_path / "user_supplied.csv"
+        f.write_text("x")
+
+        fetcher = FixedFileFetcher(f)
+        assert fetcher.fetch(date(2099, 1, 15)) == f
+        assert fetcher.fetch(date(1985, 11, 29)) == f
+
+    def test_raises_fetch_error_on_missing_path(self, tmp_path):
+        """FixedFileFetcher rejects a non-existent path at construction."""
+        with pytest.raises(FetchError, match="does not exist"):
+            FixedFileFetcher(tmp_path / "nope.csv")
+
+    def test_raises_fetch_error_when_path_is_directory(self, tmp_path):
+        """FixedFileFetcher rejects a directory (must be a regular file)."""
+        with pytest.raises(FetchError, match="not a regular file"):
+            FixedFileFetcher(tmp_path)
 
 
 class TestNseHttpFetcher:
@@ -117,10 +167,55 @@ class TestNseHttpFetcher:
             fetcher.fetch(date(2099, 1, 15))
 
     def test_source_type_enum_has_all_sources(self):
-        """SourceType must cover all automated sources (A, B, C, E, F, G)."""
-        expected = {"BHAVCOPY", "WK52", "CONSTITUENTS", "CORPORATE_ACTIONS",
-                    "EVENT_CALENDAR", "ANNOUNCEMENTS"}
+        """SourceType must cover all automated sources (J, A, B, C, E, F, G)."""
+        expected = {"DIM_STOCK", "BHAVCOPY", "WK52", "CONSTITUENTS",
+                    "CORPORATE_ACTIONS", "EVENT_CALENDAR", "ANNOUNCEMENTS"}
         assert expected.issubset({s.name for s in SourceType})
+
+    def test_dim_stock_downloads_and_decompresses_gzipped_csv(self, tmp_path):
+        """NseHttpFetcher decompresses NSE_CM_security_DDMMYYYY.csv.gz on the fly."""
+        import gzip
+
+        csv_body = (
+            b"FinInstrmId,TckrSymb,SctySrs,FinInstrmNm,ISIN,ParVal,ListgDt\n"
+            b"2885,RELIANCE,EQ,RELIANCE INDUSTRIES LTD,INE002A01018,1000,502070400\n"
+        )
+        gz_body = gzip.compress(csv_body)
+
+        mock_resp = MagicMock()
+        mock_resp.content = gz_body
+        mock_client = MagicMock()
+        mock_client._request_with_retry.return_value = mock_resp
+
+        fetcher = NseHttpFetcher(
+            source=SourceType.DIM_STOCK,
+            client=mock_client,
+            output_dir=tmp_path,
+        )
+        out = fetcher.fetch(date(2026, 4, 27))
+
+        assert out.exists()
+        assert out.name == "NSE_CM_security_27042026.csv"
+        # File on disk is the *decompressed* CSV
+        assert out.read_bytes() == csv_body
+        # Confirm we hit the right URL (DDMMYYYY format)
+        called_url = mock_client._request_with_retry.call_args[0][0]
+        assert "NSE_CM_security_27042026.csv.gz" in called_url
+
+    def test_dim_stock_raises_fetch_error_on_bad_gzip(self, tmp_path):
+        """NseHttpFetcher wraps OSError from gzip.decompress as FetchError."""
+        mock_resp = MagicMock()
+        mock_resp.content = b"this is not gzip"
+        mock_client = MagicMock()
+        mock_client._request_with_retry.return_value = mock_resp
+
+        fetcher = NseHttpFetcher(
+            source=SourceType.DIM_STOCK,
+            client=mock_client,
+            output_dir=tmp_path,
+        )
+        with pytest.raises(FetchError, match="decompress"):
+            fetcher.fetch(date(2026, 4, 27))
 
 
 from ingestion.framework.fetchers.hybrid_fetcher import HybridFetcher

@@ -5,6 +5,7 @@ so that :class:`HybridFetcher` has a single exception type to catch.
 """
 from __future__ import annotations
 
+import gzip
 import logging
 from datetime import date
 from enum import Enum, auto
@@ -20,11 +21,16 @@ logger = logging.getLogger(__name__)
 
 # NSE 52-week archive URL template (date in DDMMYYYY format)
 _WK52_URL_TEMPLATE = (
-    "https://nsearchives.nseindia.com/products/content/"
+    "https://nsearchives.nseindia.com/content/"
     "CM_52_wk_High_low_{ddmmyyyy}.csv"
 )
 # Constituents file is always the current list — no date in URL
 _CONSTITUENTS_URL = "https://archives.nseindia.com/content/indices/ind_nifty50list.csv"
+# NSE security master (gzipped CSV; date in DDMMYYYY format)
+_DIM_STOCK_URL_TEMPLATE = (
+    "https://nsearchives.nseindia.com/content/cm/interop/"
+    "NSE_CM_security_{ddmmyyyy}.csv.gz"
+)
 # Corporate actions, event calendar, announcements — JSON APIs handled by NSEScraper
 _EVENT_CALENDAR_URL = "https://www.nseindia.com/api/event-calendar?index=equities"
 _ANNOUNCEMENTS_URL = "https://www.nseindia.com/api/corporate-announcements?index=equities"
@@ -35,6 +41,7 @@ class SourceType(Enum):
     BHAVCOPY = auto()           # sec_bhavdata_full_DDMMYYYY.csv
     WK52 = auto()               # CM_52_wk_High_low_DDMMYYYY.csv
     CONSTITUENTS = auto()       # ind_nifty50list.csv
+    DIM_STOCK = auto()          # NSE_CM_security_DDMMYYYY.csv.gz (security master)
     CORPORATE_ACTIONS = auto()  # per-symbol corporate actions API
     EVENT_CALENDAR = auto()     # event-calendar JSON API
     ANNOUNCEMENTS = auto()      # corporate-announcements JSON API
@@ -102,6 +109,14 @@ class NseHttpFetcher(BaseFetcher):
                 filename="ind_nifty50list.csv",
                 subdir="constituents",
             )
+        if self.source == SourceType.DIM_STOCK:
+            return self._download_csv_gz(
+                url=_DIM_STOCK_URL_TEMPLATE.format(
+                    ddmmyyyy=trade_date.strftime("%d%m%Y")
+                ),
+                filename=f"NSE_CM_security_{trade_date.strftime('%d%m%Y')}.csv",
+                subdir="dim_stock",
+            )
         if self.source == SourceType.EVENT_CALENDAR:
             return self._download_json(
                 url=_EVENT_CALENDAR_URL,
@@ -132,6 +147,41 @@ class NseHttpFetcher(BaseFetcher):
         out = self._save_dir(subdir) / filename
         out.write_bytes(resp.content)
         logger.info("Downloaded %s → %s", url, out)
+        return out
+
+    def _download_csv_gz(self, url: str, filename: str, subdir: str) -> Path:
+        """Download a gzipped CSV, decompress on the fly, and save as *filename*.
+
+        NSE security master is published as ``.csv.gz``. We decompress before
+        writing to disk so downstream loaders can open the file with
+        ``pd.read_csv`` without needing to know the wire format.
+
+        Args:
+            url: Full URL to the ``.csv.gz`` file.
+            filename: Target filename for the *decompressed* CSV.
+            subdir: Subdirectory under ``data/raw/`` to save into.
+
+        Returns:
+            Path to the decompressed CSV on disk.
+
+        Raises:
+            FetchError: If the gzip stream is invalid (caller wraps via
+                :meth:`fetch`'s ``requests.RequestException`` handler is not
+                enough — gzip errors are :class:`OSError`).
+        """
+        resp = self._client._request_with_retry(url)
+        try:
+            decompressed = gzip.decompress(resp.content)
+        except OSError as exc:
+            raise FetchError(
+                f"Could not decompress gzip stream from {url}: {exc}"
+            ) from exc
+        out = self._save_dir(subdir) / filename
+        out.write_bytes(decompressed)
+        logger.info(
+            "Downloaded + decompressed %s → %s (%d bytes)",
+            url, out, len(decompressed),
+        )
         return out
 
     def _download_json(self, url: str, filename: str, subdir: str) -> Path:

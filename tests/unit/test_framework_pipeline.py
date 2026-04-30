@@ -137,3 +137,149 @@ class TestPipeline:
         pipe.run(date(2099, 1, 15))
 
         loader.load.assert_called_once_with(fake_path, date(2099, 1, 15))
+
+
+class TestPipelineProcessedDir:
+    def _build(self, src_path, processed_dir):
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch.return_value = src_path
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = 1
+        return Pipeline(
+            fetcher=mock_fetcher,
+            loader=mock_loader,
+            ingestion_logger=MagicMock(),
+            source_name="dim-stock",
+            table_name="dim_stock",
+            processed_dir=processed_dir,
+        )
+
+    def test_moves_file_after_successful_load(self, tmp_path):
+        """After success, source file is moved into processed_dir."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        src = raw / "NSE_CM_security_15012099.csv"
+        src.write_text("hello")
+        processed = tmp_path / "processed"
+
+        pipe = self._build(src, processed)
+        pipe.run(date(2099, 1, 15))
+
+        assert not src.exists()
+        moved = processed / "NSE_CM_security_15012099.csv"
+        assert moved.exists()
+        assert moved.read_text() == "hello"
+
+    def test_does_not_move_on_failure(self, tmp_path):
+        """On loader failure, the raw file stays put for inspection."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        src = raw / "bad.csv"
+        src.write_text("x")
+        processed = tmp_path / "processed"
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch.return_value = src
+        mock_loader = MagicMock()
+        mock_loader.load.side_effect = ValueError("parse boom")
+
+        pipe = Pipeline(
+            fetcher=mock_fetcher,
+            loader=mock_loader,
+            ingestion_logger=MagicMock(),
+            source_name="dim-stock",
+            table_name="dim_stock",
+            processed_dir=processed,
+        )
+        with pytest.raises(ValueError):
+            pipe.run(date(2099, 1, 15))
+
+        assert src.exists(), "raw file should remain on failure"
+        assert not (processed / "bad.csv").exists()
+
+    def test_handles_filename_collision_with_date_suffix(self, tmp_path):
+        """Re-running for the same file appends the trade_date suffix."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        src = raw / "report.csv"
+        src.write_text("v2")
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        # Pre-existing archived file with the same name
+        (processed / "report.csv").write_text("v1")
+
+        pipe = self._build(src, processed)
+        pipe.run(date(2099, 1, 15))
+
+        # Original archive intact, new copy gets a date-suffixed name
+        assert (processed / "report.csv").read_text() == "v1"
+        assert (processed / "report.2099-01-15.csv").read_text() == "v2"
+
+    def test_no_op_when_processed_dir_is_none(self, tmp_path):
+        """processed_dir=None disables the move (file remains in place)."""
+        src = tmp_path / "stays.csv"
+        src.write_text("x")
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch.return_value = src
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = 1
+
+        pipe = Pipeline(
+            fetcher=mock_fetcher,
+            loader=mock_loader,
+            ingestion_logger=MagicMock(),
+            source_name="x",
+            table_name="x",
+            processed_dir=None,
+        )
+        pipe.run(date(2099, 1, 15))
+        assert src.exists()
+
+
+class TestBadRecordsWriter:
+    def test_writes_dropped_rows_to_csv(self, tmp_path):
+        """BadRecordsWriter persists dropped rows under log_dir."""
+        import pandas as pd
+        from ingestion.framework.bad_records import BadRecordsWriter
+
+        writer = BadRecordsWriter(source="dim-stock", log_dir=tmp_path)
+        df = pd.DataFrame({"symbol": ["FOO", "BAR"], "isin": [None, "INE000A"]})
+        out = writer.write(df, original_filename="NSE_CM_security_15012099.csv",
+                           reason="missing isin")
+
+        assert out is not None
+        assert out.exists()
+        content = out.read_text()
+        assert "FOO" in content and "BAR" in content
+        # _drop_reason column is appended for context
+        assert "missing isin" in content
+
+    def test_returns_none_for_empty_df(self, tmp_path):
+        """Writing an empty DataFrame is a no-op (no file created)."""
+        import pandas as pd
+        from ingestion.framework.bad_records import BadRecordsWriter
+
+        writer = BadRecordsWriter(source="x", log_dir=tmp_path)
+        result = writer.write(pd.DataFrame(),
+                              original_filename="empty.csv", reason="—")
+
+        assert result is None
+        assert list(tmp_path.iterdir()) == []
+
+    def test_appends_when_called_multiple_times(self, tmp_path):
+        """Second write to the same filename appends rather than overwrites."""
+        import pandas as pd
+        from ingestion.framework.bad_records import BadRecordsWriter
+
+        writer = BadRecordsWriter(source="x", log_dir=tmp_path)
+        writer.write(pd.DataFrame({"a": [1]}), original_filename="f.csv",
+                     reason="r1")
+        writer.write(pd.DataFrame({"a": [2]}), original_filename="f.csv",
+                     reason="r2")
+
+        out = (tmp_path / "f.csv").read_text()
+        # Both rows present, header only once
+        assert out.count("\n") == 3  # header + 2 rows + trailing \n
+        assert "1" in out and "2" in out
+        assert "r1" in out and "r2" in out

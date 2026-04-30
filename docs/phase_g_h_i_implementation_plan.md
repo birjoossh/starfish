@@ -277,7 +277,7 @@ def render_watchlist_tab():
 | A-03 | ISS Momentum Breakdown | `iss_score` drops below 40 (was > 60 in 10 days) | Daily EOD |
 | A-04 | Extreme Volume Spike | `spike_level = 'Extreme'` (> 3.0x) | Real-time / EOD fallback |
 | A-05 | Critical Corporate Event | `significance_score >= 4` | Real-time |
-| A-06 | Index Reconstitution | New `dim_nifty50_constituent` row | Real-time |
+| A-06 | Index Reconstitution | New ``dim_nifty50_constituent`` row | Real-time |
 | A-07 | Watchlist Large Move | `ABS(return_1d) >= 5%` for watchlist stocks | Daily EOD |
 | A-08 | Market Breadth Stress | < 10 advancing stocks out of 50 | Daily EOD |
 | A-09 | Multiple 52-Week Lows | 3+ stocks at new 52W low | Daily EOD |
