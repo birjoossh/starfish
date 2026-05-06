@@ -230,16 +230,20 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
 
         if not sector_data.empty:
             sector_data = sector_data.sort_values(by="avg_return_1d", ascending=False)
-            filtered_sector = filter_dataframe(sector_data, st.session_state.sec_search)
+            sector_display = sector_data.copy()
+            for ratio_col in ("avg_return_1d", "avg_return_1m"):
+                if ratio_col in sector_display.columns:
+                    sector_display[ratio_col] = sector_display[ratio_col].astype(float) * 100
+            filtered_sector = filter_dataframe(sector_display, st.session_state.sec_search)
             st.dataframe(
                 filtered_sector,
                 use_container_width=True,
                 height=260, # Lock height
                 column_config={
                     "sector": st.column_config.TextColumn("Sector", width="medium"),
-                    "avg_return_1d": st.column_config.NumberColumn(format="%+.2f%%"),
-                    "avg_return_1m": st.column_config.NumberColumn(format="%+.2f%%"),
-                    "avg_iss": st.column_config.NumberColumn(format="%.0f"),
+                    "avg_return_1d": st.column_config.NumberColumn("Avg 1D %", format="%+.2f%%", help=tooltip("return_1d")),
+                    "avg_return_1m": st.column_config.NumberColumn("Avg 1M %", format="%+.2f%%", help=tooltip("return_1m")),
+                    "avg_iss": st.column_config.NumberColumn("Avg ISS", format="%.0f", help=tooltip("iss_score")),
                 }
             )
 
@@ -253,7 +257,8 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
             watch_df = signals_df[signals_df["symbol"].isin(watchlist)][[
                 "symbol", "close", "return_1d", "vol_ratio_1d", "iss_score", "signal_category"
             ]].copy()
-            watch_df.columns = ["Symbol", "Close", "Ret 1D", "Vol", "ISS", "Signal"]
+            watch_df["return_1d"] = watch_df["return_1d"].astype(float) * 100
+            watch_df.columns = ["Symbol", "Close", "Ret 1D", "Vol 20D", "ISS", "Signal"]
             filtered_watch = filter_dataframe(watch_df, st.session_state.watch_search)
             st.dataframe(
                 filtered_watch,
@@ -263,7 +268,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                     "Symbol": st.column_config.TextColumn("Symbol", width="medium"),
                     "Close": st.column_config.NumberColumn(format="₹%.2f"),
                     "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                    "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                    "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
                     "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
                     "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
                 }
@@ -283,12 +288,13 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
 
         if not gainers_data.empty:
             g_disp = gainers_data[disp_cols].copy()
-            g_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol", "ISS"]
+            g_disp["return_1d"] = g_disp["return_1d"].astype(float) * 100
+            g_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol 20D", "ISS"]
             filtered_gain = filter_dataframe(g_disp, st.session_state.gain_search)
             st.dataframe(filtered_gain, use_container_width=True, hide_index=True, column_config={
                 "Sector": st.column_config.TextColumn("Sector", width="medium"),
                 "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
                 "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
             })
 
@@ -300,12 +306,13 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
 
         if not losers_data.empty:
             l_disp = losers_data[disp_cols].copy()
-            l_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol", "ISS"]
+            l_disp["return_1d"] = l_disp["return_1d"].astype(float) * 100
+            l_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol 20D", "ISS"]
             filtered_lose = filter_dataframe(l_disp, st.session_state.lose_search)
             st.dataframe(filtered_lose, use_container_width=True, hide_index=True, column_config={
                 "Sector": st.column_config.TextColumn("Sector", width="medium"),
                 "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
                 "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
             })
 
@@ -324,15 +331,18 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
             "drawdown_from_52w_high_pct", "distance_from_52w_low_pct",
             "iss_score", "signal_category", "momentum_flag", "accumulation_flag",
         ]].copy()
-    
+
+        for ratio_col in ("return_1d", "return_1m", "return_3m"):
+            display_df[ratio_col] = display_df[ratio_col].astype(float) * 100
+
         display_df["momentum_flag"] = display_df["momentum_flag"].apply(lambda x: "MOM" if x else "")
         display_df["accumulation_flag"] = display_df["accumulation_flag"].apply(lambda x: "ACC" if x else "")
         display_df["watch"] = display_df["symbol"].apply(lambda s: "★" if s in watchlist else "")
-    
+
         display_df.columns = [
             "Symbol", "Company", "Sector", "Close",
             "Ret 1D", "Ret 1M", "Ret 3M",
-            "Vol", "Avg Vol",
+            "Vol 20D", "Avg Vol 20D",
             "% from 52W High", "% from 52W Low",
             "ISS", "Signal", "Momentum", "Accum",
             "Watch",
@@ -351,8 +361,8 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                 "Ret 1M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1m")),
                 "Ret 3M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_3m")),
                 "Close": st.column_config.NumberColumn(format="₹%.2f"),
-                "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                "Avg Vol": st.column_config.NumberColumn(help=tooltip("avg_volume_20d")),
+                "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "Avg Vol 20D": st.column_config.NumberColumn(help=tooltip("avg_volume_20d")),
                 "% from 52W High": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("drawdown_pct")),
                 "% from 52W Low": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("distance_from_low")),
                 "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),

@@ -74,25 +74,30 @@ WIDGETS: dict[str, WidgetInfo] = {
     # ------------------------------------------------------------------
     "overall_breadth": WidgetInfo(
         title="Overall Breadth",
-        short="How many Nifty 50 stocks closed up vs down today.",
+        short="How many Nifty 50 stocks closed up vs down on the selected date.",
         formula="advancing = count(return_1d > 0); declining = count(return_1d < 0)",
         deep_dive=(
-            "**What it tells you.** Breadth answers a simple question: was today's "
-            "move broad or narrow? When 35+ stocks advance, the index move is "
-            "supported by the whole market. When only a handful do, the headline "
-            "index can rise on the back of two or three large names while most "
-            "stocks are actually weak.\n\n"
+            "**Aggregation window.** Single trading day — the selected `calc_date`. "
+            "Universe: current 50 Nifty constituents (51 rows during a "
+            "reconstitution).\n\n"
+            "**What it tells you.** Breadth answers a simple question: was the "
+            "day's move broad or narrow? When 35+ stocks advance, the index move "
+            "is supported by the whole market. When only a handful do, the "
+            "headline index can rise on the back of two or three large names "
+            "while most stocks are actually weak.\n\n"
             "**Edge cases.** A stock with `return_1d == 0` is counted as "
-            "unchanged, not advancing. The count is restricted to current Nifty 50 "
-            "members.\n\n"
+            "unchanged, not advancing.\n\n"
             "**Reference.** Spec §4 View 1, Widget 1.3 (Advancing vs Declining)."
         ),
     ),
     "average_iss": WidgetInfo(
         title="Average ISS",
-        short="Mean Investment Signal Score across all 50 constituents (0-100).",
+        short="Equal-weighted mean ISS across all 50 constituents on the selected date (0-100).",
         formula="avg_iss = mean(iss_score) over Nifty 50 members on calc_date",
         deep_dive=(
+            "**Aggregation window.** Single trading day — the selected "
+            "`calc_date`. Each constituent contributes one ISS observation; the "
+            "average is **equal-weighted**, not market-cap weighted.\n\n"
             "**What it tells you.** A single-number snapshot of how attractive "
             "the index *as a basket* looks today on the seven-factor ISS framework "
             "(price, RS vs Nifty, drawdown, volume, events, trend stability, "
@@ -100,21 +105,22 @@ WIDGETS: dict[str, WidgetInfo] = {
             "broadly constructive tape; readings below ~40 indicate the average "
             "stock is failing several factors simultaneously.\n\n"
             "**Edge cases.** ISS is bounded to [0, 100] in code; missing inputs "
-            "default to a neutral sub-score (see `analytics/iss_scorer.py`). The "
-            "average is equal-weighted across constituents — it is *not* market-"
-            "cap weighted.\n\n"
+            "default to a neutral sub-score (see `analytics/iss_scorer.py`).\n\n"
             "**Reference.** Spec §6.1 (ISS factor weights); "
             "`analytics/iss_scorer.py::compute_iss`."
         ),
     ),
     "avg_1d_return": WidgetInfo(
         title="Average 1-Day Return",
-        short="Equal-weighted mean of today's percentage returns across the 50 names.",
+        short="Equal-weighted mean of the selected day's % returns across all 50 names.",
         formula="avg_1d = mean(return_1d) * 100 (%)",
         deep_dive=(
-            "**What it tells you.** This is a breadth-weighted view of the day. "
-            "Compare it to the headline Nifty 50 index move — if the index is up "
-            "+0.8% but the equal-weighted average is only +0.1%, the rally was "
+            "**Aggregation window.** Single trading day — the selected "
+            "`calc_date`. Equal-weighted across the 50 constituents (each stock "
+            "counts once, regardless of market cap).\n\n"
+            "**What it tells you.** A breadth-weighted view of the day. Compare "
+            "it to the headline Nifty 50 index move — if the index is up +0.8% "
+            "but the equal-weighted average is only +0.1%, the rally was "
             "concentrated in a few large names (a Breadth Divergence signal in "
             "spec terminology).\n\n"
             "**Reference.** Spec §4 View 1, Widget 1.4 (Average Constituent "
@@ -123,9 +129,12 @@ WIDGETS: dict[str, WidgetInfo] = {
     ),
     "top_sector": WidgetInfo(
         title="Top Sector",
-        short="Sector with the highest equal-weighted average 1-day return today.",
+        short="Sector with the highest equal-weighted average 1-day return on the selected date.",
         formula="argmax over sectors of mean(return_1d) within sector",
         deep_dive=(
+            "**Aggregation window.** Single trading day — the selected "
+            "`calc_date`. Within each sector the per-stock 1-day return is "
+            "averaged equal-weighted; the sector with the highest mean wins.\n\n"
             "**What it tells you.** Quick read on rotation. A different sector "
             "topping the leaderboard most days is a healthy, rotational tape; "
             "the same defensive sector leading repeatedly often signals risk-off "
@@ -183,9 +192,20 @@ WIDGETS: dict[str, WidgetInfo] = {
     ),
     "sector_aggregation": WidgetInfo(
         title="Sector Aggregation",
-        short="Per-sector averages of 1D / 1M return and ISS, plus advancer / decliner counts.",
-        formula="group by sector; avg(return_*); avg(iss_score); count(advancing/declining)",
+        short="Per-sector averages of 1D and 1M return, ISS, and advancer / decliner counts.",
+        formula="group by sector; avg(return_1d), avg(return_1m), avg(iss_score); count(advancing/declining)",
         deep_dive=(
+            "**Aggregation windows (per sector, on the selected `calc_date`).**\n\n"
+            "* **Avg 1D %** — equal-weighted mean of `return_1d` across the "
+            "sector's Nifty 50 members on the selected date.\n"
+            "* **Avg 1M %** — equal-weighted mean of `return_1m` (~21 trading "
+            "sessions of trailing return) across the same sector members.\n"
+            "* **Avg ISS** — equal-weighted mean of the seven-factor ISS within "
+            "the sector.\n"
+            "* **Advancing / Declining** — counts of `return_1d > 0` vs `< 0` "
+            "within the sector on the selected date.\n\n"
+            "All averages are equal-weighted across constituents — they are *not* "
+            "market-cap weighted.\n\n"
             "**What it tells you.** Where capital is rotating *to* and *from*. "
             "Persistent leadership at both 1D and 1M horizons is a stronger "
             "signal than a one-day pop.\n\n"
@@ -426,6 +446,10 @@ WIDGETS: dict[str, WidgetInfo] = {
         short="Count of filtered stocks whose drawdown is at or below the threshold.",
         formula="count(rows where drawdown_from_52w_high_pct <= threshold)",
         deep_dive=(
+            "**Aggregation window.** Single trading day — the selected "
+            "`calc_date`. The drawdown itself is measured against the rolling "
+            "trailing 52-week high (252 trading sessions), so the comparison "
+            "window is implicitly 1Y.\n\n"
             "Used as a quick gauge of how broad the pain is at the chosen "
             "threshold. A reading of 5+ at -20% inside Nifty 50 is meaningful — "
             "the index is supposed to be the highest-quality liquid universe."
@@ -436,6 +460,11 @@ WIDGETS: dict[str, WidgetInfo] = {
         short="Average drawdown across all sector-filtered names (not just those past the threshold).",
         formula="mean(drawdown_from_52w_high_pct) over current sector filter",
         deep_dive=(
+            "**Aggregation window.** Universe = Nifty 50 names matching the "
+            "current sector multiselect on the selected `calc_date`. Each "
+            "stock's drawdown is itself measured against its trailing "
+            "**52-week** high (252 sessions), then averaged equal-weighted "
+            "across that universe.\n\n"
             "**Why filtered, not threshold-filtered.** The metric uses the "
             "*sector-filter* universe rather than only the threshold-passing "
             "rows so it stays meaningful when the threshold is tightened — "
@@ -594,9 +623,15 @@ WIDGETS: dict[str, WidgetInfo] = {
     ),
     "volume_anomaly_buckets": WidgetInfo(
         title="Same-day volume buckets",
-        short="Splits today's tape into >100% / >50% / >20% above-average and contraction buckets.",
+        short="Splits the selected day's tape into >100% / >50% / >20% above-average and contraction buckets.",
         formula=">100%: vr>=2.0; >50%: 1.5<=vr<2.0; >20%: 1.2<=vr<1.5; Contraction: vr<=0.85 AND trend=Contracting",
         deep_dive=(
+            "**Aggregation windows.**\n\n"
+            "* The numerator is **1-day** volume on the selected `calc_date`.\n"
+            "* The denominator (used in `vol_ratio_1d`) is the **20-day** "
+            "trailing average volume.\n"
+            "* The `Contraction` bucket additionally requires the **3-month** "
+            "(63-session) volume trend to be classified `Contracting`.\n\n"
             "**Why thresholds matter.** Spec §5 Table 8 spike levels:\n\n"
             "* `Mild` 1.2-1.5x — early-warning.\n"
             "* `Moderate` 1.5-2.0x — meaningful.\n"
@@ -651,7 +686,12 @@ WIDGETS: dict[str, WidgetInfo] = {
         title="Total Events",
         short="Number of events matching the current filter (date range + type + min significance).",
         formula="count(events where filters apply)",
-        deep_dive="Resets when filters change. Spec §4 View 6, Widget 6.1.",
+        deep_dive=(
+            "**Aggregation window.** The user-selected `From Date` to `To Date` "
+            "range (defaults to the past 30 days through the next 60 days). "
+            "Recomputed on every filter change.\n\n"
+            "**Reference.** Spec §4 View 6, Widget 6.1."
+        ),
     ),
     "events_upcoming": WidgetInfo(
         title="Upcoming Events",
@@ -669,6 +709,10 @@ WIDGETS: dict[str, WidgetInfo] = {
         short="Events with event_date already in the past inside the selected window.",
         formula="count(events where event_date <= CURRENT_DATE within window)",
         deep_dive=(
+            "**Aggregation window.** Bounded by the user-selected `From Date` "
+            "(default = today minus 30 days). The metric label 'Past 30d' "
+            "matches the default; if you widen the From Date, the count grows "
+            "to cover the new window.\n\n"
             "Pair this with the price-impact columns (1D / 5D / 20D) on the "
             "expanded event card to assess how the market actually reacted."
         ),
@@ -810,19 +854,22 @@ WIDGETS: dict[str, WidgetInfo] = {
     ),
     "kpi_gainers": WidgetInfo(
         title="Gainers (count + share)",
-        short="How many stocks closed positive today, and what share of the universe that is.",
+        short="How many stocks closed positive on the selected date, and what share of the universe that is.",
         formula="count(return_1d > 0); share = count / 50 * 100",
         deep_dive=(
-            "Same definition as `Overall Breadth` but framed as a percentage "
-            "of the 50-name universe for quick mental anchoring (e.g. '32 / 50 "
-            "= 64% advancing')."
+            "**Aggregation window.** Single trading day — the selected "
+            "`calc_date`. Denominator is fixed at 50 (Nifty 50 universe), so "
+            "the share reads cleanly as 'X / 50 = X% advancing'.\n\n"
+            "Same numerator as `Overall Breadth`."
         ),
     ),
     "kpi_losers": WidgetInfo(
         title="Losers (count + share)",
-        short="How many stocks closed negative today, and what share of the universe that is.",
+        short="How many stocks closed negative on the selected date, and what share of the universe that is.",
         formula="count(return_1d < 0); share = count / 50 * 100",
         deep_dive=(
+            "**Aggregation window.** Single trading day — the selected "
+            "`calc_date`. Denominator is fixed at 50 (Nifty 50 universe).\n\n"
             "Mirror of the Gainers KPI; useful for at-a-glance breadth on "
             "down days."
         ),

@@ -234,8 +234,9 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
                 "MOM tier",
             ]
         ].copy()
-        m_show["return_1d"] *= 100
-        m_show["return_3m"] *= 100
+        m_show["return_1d"] = m_show["return_1d"].astype(float) * 100
+        m_show["return_3m"] = m_show["return_3m"].astype(float) * 100
+        m_show["rs_vs_nifty_3m"] = m_show["rs_vs_nifty_3m"].astype(float) * 100
         m_show.columns = [
             "Symbol",
             "Company",
@@ -359,16 +360,16 @@ def render_volume_tab(df: pd.DataFrame, calc_date: str) -> None:
                 st.caption("—")
             else:
                 sub = part[["symbol", "vol_ratio_1d", "return_1d", "iss_score"]].copy()
-                sub["return_1d"] *= 100
-                sub.columns = ["Symbol", "Vol×", "1D %", "ISS"]
+                sub["return_1d"] = sub["return_1d"].astype(float) * 100
+                sub.columns = ["Symbol", "Vol 20D", "1D %", "ISS"]
                 st.dataframe(
                     sub,
                     hide_index=True,
                     height=min(260, 36 * (len(sub) + 1)),
                     use_container_width=True,
                     column_config={
-                        "Vol×": st.column_config.NumberColumn(help=tooltip("vol_ratio_1d")),
-                        "1D %": st.column_config.NumberColumn(help=tooltip("return_1d")),
-                        "ISS": st.column_config.NumberColumn(help=tooltip("iss_score")),
+                        "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                        "1D %": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
+                        "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
                     },
                 )
