@@ -7,6 +7,8 @@ import streamlit as st
 import pandas as pd
 from typing import Optional
 
+from dashboard.widget_info import tooltip
+
 
 def detect_mobile() -> bool:
     """Detect if user is on mobile device."""
@@ -74,14 +76,14 @@ def render_kpi_cards_mobile(signals_df: pd.DataFrame):
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Top ISS", top_iss["symbol"], f"{top_iss['iss_score']:.0f}")
+        st.metric("Top ISS", top_iss["symbol"], f"{top_iss['iss_score']:.0f}", help=tooltip("kpi_top_iss"))
     with col2:
         avg_iss = signals_df["iss_score"].mean()
-        st.metric("Avg ISS", f"{avg_iss:.0f}")
+        st.metric("Avg ISS", f"{avg_iss:.0f}", help=tooltip("average_iss"))
     with col3:
-        st.metric("Gainers", len(gainers), f"{len(gainers)/50*100:.0f}%")
+        st.metric("Gainers", len(gainers), f"{len(gainers)/50*100:.0f}%", help=tooltip("kpi_gainers"))
     with col4:
-        st.metric("Losers", len(losers), f"-{len(losers)/50*100:.0f}%")
+        st.metric("Losers", len(losers), f"-{len(losers)/50*100:.0f}%", help=tooltip("kpi_losers"))
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -233,16 +235,16 @@ def render_view_desktop():
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         top = signals_df.nlargest(1, "iss_score").iloc[0]
-        st.metric("Top ISS", top["symbol"], f"{top['iss_score']:.0f}")
+        st.metric("Top ISS", top["symbol"], f"{top['iss_score']:.0f}", help=tooltip("kpi_top_iss"))
     with col2:
         avg = signals_df["iss_score"].mean()
-        st.metric("Avg ISS", f"{avg:.0f}")
+        st.metric("Avg ISS", f"{avg:.0f}", help=tooltip("average_iss"))
     with col3:
         gainers = len(signals_df[signals_df["return_1d"] > 0])
-        st.metric("Gainers", gainers, f"{gainers/50*100:.0f}%")
+        st.metric("Gainers", gainers, f"{gainers/50*100:.0f}%", help=tooltip("kpi_gainers"))
     with col4:
         losers = len(signals_df[signals_df["return_1d"] < 0])
-        st.metric("Losers", losers, f"-{losers/50*100:.0f}%")
+        st.metric("Losers", losers, f"-{losers/50*100:.0f}%", help=tooltip("kpi_losers"))
 
     # Top movers table
     st.markdown("### Top ISS Scores")

@@ -21,6 +21,7 @@ from dashboard.phase_g import (
     render_watchlist_builder,
 )
 from dashboard.watchlist import load_watchlist
+from dashboard.widget_info import render_info, tooltip
 
 API_URL = "http://localhost:8000"
 
@@ -106,7 +107,7 @@ def main():
     with t1:
         selected_date = st.selectbox("Date", dates, index=0, label_visibility="collapsed")
     with t2:
-        st.caption("☀️ **Morning Digest** — Top 3 by ISS Score")
+        st.caption("☀️ **Morning Digest** — Top 3 by ISS Score", help=tooltip("morning_digest"))
         signals_df  = load_screener_signals(str(selected_date))
         if not signals_df.empty:
             d_cols = st.columns(3)
@@ -178,15 +179,16 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
         avg_1d = components["return_1d"].mean() * 100
         
         m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("Overall Breadth", f"{int(adv_total)} Adv", f"{-int(dec_total)} Dec")
-        m2.metric("Average ISS", f"{components['iss_score'].mean():.0f}/100")
-        m3.metric("Avg 1D Return", f"{avg_1d:+.2f}%")
+        m1.metric("Overall Breadth", f"{int(adv_total)} Adv", f"{-int(dec_total)} Dec", help=tooltip("overall_breadth"))
+        m2.metric("Average ISS", f"{components['iss_score'].mean():.0f}/100", help=tooltip("average_iss"))
+        m3.metric("Avg 1D Return", f"{avg_1d:+.2f}%", help=tooltip("avg_1d_return"))
         top_sector = sector_data.loc[sector_data["avg_return_1d"].idxmax()]["sector"] if not sector_data.empty else "N/A"
-        m4.metric("Top Sector", top_sector)
-        m5.metric("Market Structure", "Mean Reverting")
+        m4.metric("Top Sector", top_sector, help=tooltip("top_sector"))
+        m5.metric("Market Structure", "Mean Reverting", help=tooltip("market_structure"))
 
     # --- Visualizations Expander (Now immediately below summary) ---
     with st.expander("📊 Nifty 50 Sector Rotation & Breadth Heatmap", expanded=True):
+        render_info("sector_rotation_heatmap")
         vc1, vc2 = st.columns([1,2])
         with vc1:
             if 'adv_total' in locals():
@@ -224,7 +226,8 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
         st_c1_hdr, st_c1_flt = st.columns([5, 4])
         st_c1_hdr.markdown("### Sector Aggregation")
         st.session_state.sec_search = st_c1_flt.text_input("Filter...", key="ti_sec", value=st.session_state.sec_search, placeholder="Filter sector...", label_visibility="collapsed")
-        
+        render_info("sector_aggregation")
+
         if not sector_data.empty:
             sector_data = sector_data.sort_values(by="avg_return_1d", ascending=False)
             filtered_sector = filter_dataframe(sector_data, st.session_state.sec_search)
@@ -244,7 +247,8 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
         st_c2_hdr, st_c2_flt = st.columns([5, 4])
         st_c2_hdr.markdown("### Watchlist Signals")
         st.session_state.watch_search = st_c2_flt.text_input("Filter...", key="ti_watch", value=st.session_state.watch_search, placeholder="Filter specific tracker...", label_visibility="collapsed")
-        
+        render_info("watchlist_signals")
+
         if watchlist and not signals_df.empty:
             watch_df = signals_df[signals_df["symbol"].isin(watchlist)][[
                 "symbol", "close", "return_1d", "vol_ratio_1d", "iss_score", "signal_category"
@@ -258,9 +262,10 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                 column_config={
                     "Symbol": st.column_config.TextColumn("Symbol", width="medium"),
                     "Close": st.column_config.NumberColumn(format="₹%.2f"),
-                    "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%"),
-                    "Vol": st.column_config.NumberColumn(format="%.2fx"),
-                    "ISS": st.column_config.NumberColumn(format="%.0f"),
+                    "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
+                    "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                    "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                    "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
                 }
             )
         else:
@@ -274,32 +279,34 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
         st_c3_hdr, st_c3_flt = st.columns([5, 4])
         st_c3_hdr.markdown("### 🔥 Mover: Gainers")
         st.session_state.gain_search = st_c3_flt.text_input("Filter...", key="ti_gain", value=st.session_state.gain_search, placeholder="Filter by symbol...", label_visibility="collapsed")
-        
+        render_info("movers_gainers")
+
         if not gainers_data.empty:
             g_disp = gainers_data[disp_cols].copy()
             g_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol", "ISS"]
             filtered_gain = filter_dataframe(g_disp, st.session_state.gain_search)
             st.dataframe(filtered_gain, use_container_width=True, hide_index=True, column_config={
                 "Sector": st.column_config.TextColumn("Sector", width="medium"),
-                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%"),
-                "Vol": st.column_config.NumberColumn(format="%.2fx"),
-                "ISS": st.column_config.NumberColumn(format="%.0f"),
+                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
+                "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
             })
 
     with c4:
         st_c4_hdr, st_c4_flt = st.columns([5, 4])
         st_c4_hdr.markdown("### ❄️ Extremes: Losers")
         st.session_state.lose_search = st_c4_flt.text_input("Filter...", key="ti_lose", value=st.session_state.lose_search, placeholder="Filter by symbol...", label_visibility="collapsed")
-        
+        render_info("movers_losers")
+
         if not losers_data.empty:
             l_disp = losers_data[disp_cols].copy()
             l_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol", "ISS"]
             filtered_lose = filter_dataframe(l_disp, st.session_state.lose_search)
             st.dataframe(filtered_lose, use_container_width=True, hide_index=True, column_config={
                 "Sector": st.column_config.TextColumn("Sector", width="medium"),
-                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%"),
-                "Vol": st.column_config.NumberColumn(format="%.2fx"),
-                "ISS": st.column_config.NumberColumn(format="%.0f"),
+                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
+                "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
             })
 
     # --- Full Master Screener ---
@@ -307,6 +314,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
     st_s_hdr, st_s_flt = st.columns([8, 4])
     st_s_hdr.markdown("### 📋 Primary Scanner Pipeline Data")
     st.session_state.scr_search = st_s_flt.text_input("Filter...", key="ti_scr", value=st.session_state.scr_search, placeholder="Filter table via Sector, Regex, or Symbol...", label_visibility="collapsed")
+    render_info("primary_scanner")
     
     if not signals_df.empty:
         display_df = signals_df[[
@@ -339,14 +347,18 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
             column_config={
                 "Sector": st.column_config.TextColumn("Sector", width="medium"),
                 "Company": st.column_config.TextColumn("Company", width="medium"),
-                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%"),
-                "Ret 1M": st.column_config.NumberColumn(format="%+.2f%%"),
-                "Ret 3M": st.column_config.NumberColumn(format="%+.2f%%"),
+                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
+                "Ret 1M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1m")),
+                "Ret 3M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_3m")),
                 "Close": st.column_config.NumberColumn(format="₹%.2f"),
-                "Vol": st.column_config.NumberColumn(format="%.2fx"),
-                "% from 52W High": st.column_config.NumberColumn(format="%.2f%%"),
-                "% from 52W Low": st.column_config.NumberColumn(format="%.2f%%"),
-                "ISS": st.column_config.NumberColumn(format="%.0f"),
+                "Vol": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "Avg Vol": st.column_config.NumberColumn(help=tooltip("avg_volume_20d")),
+                "% from 52W High": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("drawdown_pct")),
+                "% from 52W Low": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("distance_from_low")),
+                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
+                "Momentum": st.column_config.TextColumn("Momentum", help=tooltip("momentum_flag")),
+                "Accum": st.column_config.TextColumn("Accum", help=tooltip("accumulation_flag")),
             },
         )
 

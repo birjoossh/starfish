@@ -11,6 +11,7 @@ import plotly.express as px
 import streamlit as st
 
 from config.database import read_sql_df
+from dashboard.widget_info import render_info, tooltip
 
 
 def load_signals_for_phase_f(calc_date: str) -> pd.DataFrame:
@@ -96,6 +97,7 @@ def load_volume_anomaly_mart(calc_date: str) -> pd.DataFrame:
 def render_drawdown_tab(df: pd.DataFrame) -> None:
     """View 3: Drawdown scanner + tags + scatter."""
     st.subheader("View 3 · Drawdown Scanner")
+    render_info("drawdown_scanner")
     c1, c2, c3 = st.columns([2, 2, 3])
     with c1:
         threshold = st.slider(
@@ -104,7 +106,7 @@ def render_drawdown_tab(df: pd.DataFrame) -> None:
             max_value=-10,
             value=-20,
             step=1,
-            help="Show names at or below this level (more negative = deeper drawdown).",
+            help=tooltip("drawdown_threshold"),
         )
     with c2:
         sectors = sorted(df["sector"].dropna().unique().tolist())
@@ -114,9 +116,13 @@ def render_drawdown_tab(df: pd.DataFrame) -> None:
 
     with c3:
         deep_preview = dff[dff["drawdown_from_52w_high_pct"] <= float(threshold)]
-        st.metric("Names ≤ threshold", f"{len(deep_preview)}")
+        st.metric("Names ≤ threshold", f"{len(deep_preview)}", help=tooltip("drawdown_count"))
         if not dff.empty:
-            st.metric("Avg drawdown (all filtered)", f"{dff['drawdown_from_52w_high_pct'].mean():.1f}%")
+            st.metric(
+                "Avg drawdown (all filtered)",
+                f"{dff['drawdown_from_52w_high_pct'].mean():.1f}%",
+                help=tooltip("drawdown_avg"),
+            )
 
     deep = dff[dff["drawdown_from_52w_high_pct"] <= float(threshold)].copy()
     if deep.empty:
@@ -166,17 +172,21 @@ def render_drawdown_tab(df: pd.DataFrame) -> None:
         height=min(520, 40 + len(show) * 36),
         hide_index=True,
         column_config={
-            "3M %": st.column_config.NumberColumn(format="%+.1f%%"),
+            "3M %": st.column_config.NumberColumn(format="%+.1f%%", help=tooltip("return_3m")),
             "1Y %": st.column_config.NumberColumn(format="%+.1f%%"),
-            "DD vs 52W high %": st.column_config.NumberColumn(format="%.1f%%"),
-            "Dist from 52W low %": st.column_config.NumberColumn(format="%.1f%%"),
-            "ISS": st.column_config.NumberColumn(format="%.0f"),
+            "DD vs 52W high %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("drawdown_pct")),
+            "Dist from 52W low %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("distance_from_low")),
+            "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
             "Mkt cap (₹Cr)": st.column_config.NumberColumn(format="%.0f"),
             "Close": st.column_config.NumberColumn(format="₹%.2f"),
+            "Vol trend 3M": st.column_config.TextColumn("Vol trend 3M", help=tooltip("volume_trend_3m")),
+            "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
+            "Tag": st.column_config.TextColumn("Tag", help=tooltip("drawdown_tag")),
         },
     )
 
     st.caption("Tag legend: **Potential Accumulation** = contracting volume / ACC bias · **Falling Knife Risk** = expanding volume or EventDriven · **Needs Event Review** = event flag or mixed setup.")
+    render_info("drawdown_tag", label="Drawdown Tag — full rules")
 
     if len(scan) >= 3:
         fig = px.scatter(
@@ -204,6 +214,7 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
     mom["MOM tier"] = mom["iss_score"].apply(lambda x: momentum_tier_label(float(x)))
 
     st.markdown("#### Active momentum (MOM flag or Momentum category)")
+    render_info("momentum_active")
     if mom.empty:
         st.info("No momentum-flagged names on this date.")
     else:
@@ -245,19 +256,21 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
             height=min(400, 40 + len(m_show) * 36),
             hide_index=True,
             column_config={
-                "1D %": st.column_config.NumberColumn(format="%+.2f%%"),
-                "3M %": st.column_config.NumberColumn(format="%+.2f%%"),
-                "Vol 1D/20D": st.column_config.NumberColumn(format="%.2fx"),
-                "Vol 5D/20D": st.column_config.NumberColumn(format="%.2fx"),
-                "DD vs 52W %": st.column_config.NumberColumn(format="%.1f%%"),
-                "RS vs Nifty 3M": st.column_config.NumberColumn(format="%+.2f%%"),
-                "ISS": st.column_config.NumberColumn(format="%.0f"),
+                "1D %": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
+                "3M %": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_3m")),
+                "Vol 1D/20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "Vol 5D/20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_5d")),
+                "DD vs 52W %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("drawdown_pct")),
+                "RS vs Nifty 3M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("rs_vs_nifty_3m")),
+                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
                 "Close": st.column_config.NumberColumn(format="₹%.2f"),
+                "MOM tier": st.column_config.TextColumn("MOM tier", help=tooltip("momentum_tier")),
             },
         )
 
     st.markdown("#### Near-breakout radar")
     st.caption("Within ~5% of 52W high, ISS ≥ 50, not yet MOM-flagged.")
+    render_info("breakout_radar")
     near = df[
         (~df["momentum_flag"])
         & (df["drawdown_from_52w_high_pct"] >= -5.0)
@@ -270,9 +283,21 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
             ["symbol", "company_name", "sector", "close", "drawdown_from_52w_high_pct", "vol_ratio_1d", "iss_score"]
         ].copy()
         n_show.columns = ["Symbol", "Company", "Sector", "Close", "DD vs 52W %", "Vol 1D/20D", "ISS"]
-        st.dataframe(n_show, use_container_width=True, hide_index=True, height=min(320, 40 + len(n_show) * 36))
+        st.dataframe(
+            n_show,
+            use_container_width=True,
+            hide_index=True,
+            height=min(320, 40 + len(n_show) * 36),
+            column_config={
+                "DD vs 52W %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("drawdown_pct")),
+                "Vol 1D/20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
+                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                "Close": st.column_config.NumberColumn(format="₹%.2f"),
+            },
+        )
 
     st.markdown("#### RS vs Nifty (3M) — top 15")
+    render_info("rs_chart_top15")
     top = df.nlargest(15, "rs_vs_nifty_3m").copy()
     if not top.empty:
         top["rs_pct"] = top["rs_vs_nifty_3m"].astype(float) * 100.0
@@ -293,14 +318,27 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
 def render_volume_tab(df: pd.DataFrame, calc_date: str) -> None:
     """View 5: Volume anomaly buckets + contraction + optional mart."""
     st.subheader("View 5 · Volume Anomaly Monitor")
+    render_info("volume_anomaly_view")
 
     mart = load_volume_anomaly_mart(calc_date)
     if not mart.empty:
         st.markdown("#### From `mart_volume_anomaly`")
-        st.dataframe(mart, use_container_width=True, height=min(400, 40 + len(mart) * 36), hide_index=True)
+        render_info("volume_anomaly_mart")
+        st.dataframe(
+            mart,
+            use_container_width=True,
+            height=min(400, 40 + len(mart) * 36),
+            hide_index=True,
+            column_config={
+                "volume_ratio": st.column_config.NumberColumn(help=tooltip("vol_ratio_1d")),
+                "spike_level": st.column_config.TextColumn(help=tooltip("spike_level")),
+                "delivery_pct": st.column_config.NumberColumn(help=tooltip("delivery_pct")),
+            },
+        )
 
     st.markdown("#### From same-day volume ratios (`vol_ratio_1d`)")
     st.caption("Buckets vs 20D average: >20% ≈ 1.2×, >50% ≈ 1.5×, >100% ≈ 2.0×. Contraction: 1D vol ≤ 0.85× and contracting 3M trend.")
+    render_info("volume_anomaly_buckets")
 
     base = df.copy()
     vr = base["vol_ratio_1d"]
@@ -323,4 +361,14 @@ def render_volume_tab(df: pd.DataFrame, calc_date: str) -> None:
                 sub = part[["symbol", "vol_ratio_1d", "return_1d", "iss_score"]].copy()
                 sub["return_1d"] *= 100
                 sub.columns = ["Symbol", "Vol×", "1D %", "ISS"]
-                st.dataframe(sub, hide_index=True, height=min(260, 36 * (len(sub) + 1)), use_container_width=True)
+                st.dataframe(
+                    sub,
+                    hide_index=True,
+                    height=min(260, 36 * (len(sub) + 1)),
+                    use_container_width=True,
+                    column_config={
+                        "Vol×": st.column_config.NumberColumn(help=tooltip("vol_ratio_1d")),
+                        "1D %": st.column_config.NumberColumn(help=tooltip("return_1d")),
+                        "ISS": st.column_config.NumberColumn(help=tooltip("iss_score")),
+                    },
+                )
