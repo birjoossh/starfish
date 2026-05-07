@@ -120,7 +120,7 @@ def render_drawdown_tab(df: pd.DataFrame) -> None:
         if not dff.empty:
             st.metric(
                 "Avg drawdown (all filtered)",
-                f"{dff['drawdown_from_52w_high_pct'].mean():.1f}%",
+                f"{dff['drawdown_from_52w_high_pct'].mean():+.2f}%",
                 help=tooltip("drawdown_avg"),
             )
 
@@ -172,12 +172,12 @@ def render_drawdown_tab(df: pd.DataFrame) -> None:
         height=min(520, 40 + len(show) * 36),
         hide_index=True,
         column_config={
-            "3M %": st.column_config.NumberColumn(format="%+.1f%%", help=tooltip("return_3m")),
-            "1Y %": st.column_config.NumberColumn(format="%+.1f%%"),
-            "DD vs 52W high %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("drawdown_pct")),
-            "Dist from 52W low %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("distance_from_low")),
-            "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
-            "Mkt cap (₹Cr)": st.column_config.NumberColumn(format="%.0f"),
+            "3M %": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_3m")),
+            "1Y %": st.column_config.NumberColumn(format="%+.2f%%"),
+            "DD vs 52W high %": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("drawdown_pct")),
+            "Dist from 52W low %": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("distance_from_low")),
+            "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
+            "Mkt cap (₹Cr)": st.column_config.NumberColumn(format="%.2f"),
             "Close": st.column_config.NumberColumn(format="₹%.2f"),
             "Vol trend 3M": st.column_config.TextColumn("Vol trend 3M", help=tooltip("volume_trend_3m")),
             "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
@@ -261,9 +261,9 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
                 "3M %": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_3m")),
                 "Vol 1D/20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
                 "Vol 5D/20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_5d")),
-                "DD vs 52W %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("drawdown_pct")),
+                "DD vs 52W %": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("drawdown_pct")),
                 "RS vs Nifty 3M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("rs_vs_nifty_3m")),
-                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
                 "Close": st.column_config.NumberColumn(format="₹%.2f"),
                 "MOM tier": st.column_config.TextColumn("MOM tier", help=tooltip("momentum_tier")),
             },
@@ -290,9 +290,9 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
             hide_index=True,
             height=min(320, 40 + len(n_show) * 36),
             column_config={
-                "DD vs 52W %": st.column_config.NumberColumn(format="%.1f%%", help=tooltip("drawdown_pct")),
+                "DD vs 52W %": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("drawdown_pct")),
                 "Vol 1D/20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
                 "Close": st.column_config.NumberColumn(format="₹%.2f"),
             },
         )
@@ -370,6 +370,6 @@ def render_volume_tab(df: pd.DataFrame, calc_date: str) -> None:
                     column_config={
                         "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
                         "1D %": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                        "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                        "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
                     },
                 )

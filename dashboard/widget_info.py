@@ -266,46 +266,59 @@ WIDGETS: dict[str, WidgetInfo] = {
     # ------------------------------------------------------------------
     "return_1d": WidgetInfo(
         title="1-Day Return (%)",
-        short="Today's percentage price change vs prior close.",
-        formula="(close - prev_close) / prev_close * 100",
+        short="Today's percentage price change vs prior close (display: 2 decimals).",
+        formula="return_1d = (close - prev_close) / prev_close   (stored as RATIO; dashboard multiplies by 100 for display)",
         deep_dive=(
-            "**Reference.** Spec §5 Table 7 — `return_1d` (DECIMAL(8,4)). "
-            "Computed by the EOD batch from `fact_eod_price.close` and "
-            "`fact_eod_price.prev_close`."
+            "**Storage unit.** `mart_stock_signals.return_1d` is stored as a "
+            "**ratio** (e.g. 0.0616 means +6.16%). The dashboard tables "
+            "multiply by 100 before showing them with the `%+.2f%%` formatter "
+            "so the column reads as a percentage. The spec text in §5 Table 7 "
+            "says the value is in percent; in practice `analytics/returns_engine"
+            ".py` does **not** multiply, so we treat the stored value as a "
+            "ratio and convert at display time.\n\n"
+            "**Reference.** Spec §5 Table 7 — `return_1d` (DECIMAL(8,4)); "
+            "`analytics/returns_engine.py::compute_returns`."
         ),
     ),
     "return_1m": WidgetInfo(
         title="1-Month Return (%)",
-        short="Approx. 1-month return — change vs close 21 trading days ago.",
-        formula="(close_today - close_21d_ago) / close_21d_ago * 100",
+        short="Approx. 1-month return — change vs close 21 trading days ago (display: 2 decimals).",
+        formula="return_1m = (close_today - close_21d_ago) / close_21d_ago   (stored as RATIO; dashboard multiplies by 100 for display)",
         deep_dive=(
-            "**Why 21 days.** ~21 trading sessions ≈ one calendar month. Stored "
-            "in `mart_stock_signals.return_1m`.\n\n"
-            "**Reference.** Spec §5 Table 7 — `return_1m`."
+            "**Storage unit.** Stored as a **ratio** in "
+            "`mart_stock_signals.return_1m` (same convention as `return_1d`). "
+            "The dashboard multiplies by 100 before rendering with `%+.2f%%`.\n\n"
+            "**Why 21 days.** ~21 trading sessions ≈ one calendar month.\n\n"
+            "**Reference.** Spec §5 Table 7 — `return_1m`; "
+            "`analytics/returns_engine.py`."
         ),
     ),
     "return_3m": WidgetInfo(
         title="3-Month Return (%)",
-        short="Approx. 3-month return — change vs close 63 trading days ago.",
-        formula="(close_today - close_63d_ago) / close_63d_ago * 100",
+        short="Approx. 3-month return — change vs close 63 trading days ago (display: 2 decimals).",
+        formula="return_3m = (close_today - close_63d_ago) / close_63d_ago   (stored as RATIO; dashboard multiplies by 100 for display)",
         deep_dive=(
+            "**Storage unit.** Stored as a **ratio** (e.g. 0.18 = +18%). The "
+            "dashboard multiplies by 100 before rendering.\n\n"
             "**Why this matters.** 3M return is the spine of momentum signals "
             "(Factor 1 of the ISS, weight 15) and a hard gate on the MOM rule "
-            "(`return_3m > +15%` is one of the qualifying conditions).\n\n"
+            "(`return_3m > +15%` after the dashboard converts to percent).\n\n"
             "**Reference.** Spec §5 Table 7 — `return_3m`; §6.1 Factor 1; "
-            "§6.2 MOM_RULE."
+            "§6.2 MOM_RULE; `analytics/returns_engine.py`."
         ),
     ),
     "vol_ratio_1d": WidgetInfo(
         title="Vol 1D / 20D",
-        short="Today's traded quantity as a multiple of the 20-day average.",
-        formula="vol_ratio_1d = volume_today / avg_volume_20d",
+        short="Today's traded quantity as a multiple of the 20-day average (display: 2 decimals + 'x').",
+        formula="vol_ratio_1d = volume_today / avg_volume_20d   (stored as RATIO; displayed as e.g. 1.50x)",
         deep_dive=(
+            "**Storage unit.** True ratio — already a multiple. Dashboard "
+            "renders directly with `%.2fx` (no conversion needed).\n\n"
             "**How to read it.** 1.0x is exactly average. Spec thresholds:\n\n"
-            "* **>= 1.2x** — mild expansion\n"
-            "* **>= 1.5x** — moderate\n"
-            "* **>= 2.0x** — high (potential breakout / distribution)\n"
-            "* **>= 3.0x** — extreme (often event-driven, see VA-5 rule)\n"
+            "* **>= 1.20x** — mild expansion\n"
+            "* **>= 1.50x** — moderate\n"
+            "* **>= 2.00x** — high (potential breakout / distribution)\n"
+            "* **>= 3.00x** — extreme (often event-driven, see VA-5 rule)\n"
             "* **<= 0.85x** with contracting 3M trend — drying up, possible "
             "breakout setup (VA-4)\n\n"
             "**Reference.** Spec §5 Table 7 — `vol_ratio_1d`; §5 Table 8 "
@@ -325,24 +338,36 @@ WIDGETS: dict[str, WidgetInfo] = {
     ),
     "drawdown_pct": WidgetInfo(
         title="% from 52-Week High",
-        short="How far below the prior 52-week peak the current close sits (negative number).",
-        formula="(close - wk52_high) / wk52_high * 100",
+        short="How far below the prior 52-week peak the current close sits (negative; display: 2 decimals).",
+        formula="drawdown_from_52w_high_pct = (close - wk52_high) / wk52_high * 100   (stored as PERCENT)",
         deep_dive=(
-            "**How to read it.** Always non-positive. -22.5 means 22.5% below "
-            "the rolling 52-week peak. This is the key field for the Drawdown "
-            "Scanner (View 3) and one of the seven ISS factors.\n\n"
+            "**Storage unit.** Stored as a **percent** (e.g. -22.50 means "
+            "22.5% below the rolling 52-week peak). The dashboard, the "
+            "drawdown-scanner slider (-50 to -10), the alert engine "
+            "(`< -20` for Deep Drawdown), the watchlist contrarian filter, "
+            "and the signal classifier all assume this convention.\n\n"
+            "**Note on data backfill.** Earlier rows written by the framework "
+            "loader before the 2026-05 percent-fix may have been stored as "
+            "ratios (-0.225 instead of -22.50). Re-run "
+            "`ingestion.framework.loaders.wk52_loader.Wk52Loader` for any "
+            "affected `trade_date` to refresh.\n\n"
             "**Reference.** Spec §5 Table 3 (`fact_52wk.pct_from_high`); "
-            "§5 Table 7 (`drawdown_from_52w_high_pct`); §6.1 Factor 3."
+            "§5 Table 7 (`drawdown_from_52w_high_pct`); §6.1 Factor 3; "
+            "`analytics/compute_52wk.py` (canonical writer)."
         ),
     ),
     "distance_from_low": WidgetInfo(
         title="% from 52-Week Low",
-        short="How far above the prior 52-week trough the current close sits (positive number).",
-        formula="(close - wk52_low) / wk52_low * 100",
+        short="How far above the prior 52-week trough the current close sits (positive; display: 2 decimals).",
+        formula="distance_from_52w_low_pct = (close - wk52_low) / wk52_low * 100   (stored as PERCENT)",
         deep_dive=(
-            "**How to read it.** Always non-negative. 35.0 means the close is "
-            "35% above the rolling 52-week low. Used in ISS Factor 7 "
-            "(Accumulation / Breakout Alignment).\n\n"
+            "**Storage unit.** Stored as a **percent** (e.g. 35.00 means the "
+            "close is 35% above the 52-week low). Same caveat as "
+            "`drawdown_pct` regarding rows written by the older framework "
+            "loader before the 2026-05 fix.\n\n"
+            "**How to use it.** Used in ISS Factor 7 (Accumulation / "
+            "Breakout Alignment) and the watchlist 'within 1% of 52W low' "
+            "filter.\n\n"
             "**Reference.** Spec §5 Table 7 — `distance_from_52w_low_pct`; "
             "§6.1 Factor 7."
         ),
@@ -552,14 +577,17 @@ WIDGETS: dict[str, WidgetInfo] = {
     ),
     "rs_vs_nifty_3m": WidgetInfo(
         title="RS vs Nifty (3M)",
-        short="3-month relative strength — alpha vs the Nifty 50 index, in percentage points.",
-        formula="rs_vs_nifty_3m = return_3m - nifty50_return_3m",
+        short="3-month relative strength vs Nifty 50 (display: 2 decimals, percentage points).",
+        formula="rs_vs_nifty_3m = return_3m - nifty50_return_3m   (stored as RATIO; dashboard multiplies by 100 for display)",
         deep_dive=(
-            "**How to read it.** Positive = outperforming the index; negative = "
-            "underperforming. The MOM gate requires `rs_vs_nifty_3m > +5%` "
-            "(meaningful outperformance, not just being in a rising tide).\n\n"
+            "**Storage unit.** `analytics/rs_engine.py` subtracts two ratio "
+            "returns and stores the result as a **ratio** "
+            "(`rs_vs_nifty_3m = 0.07` means +7 percentage points alpha). The "
+            "dashboard multiplies by 100 before rendering with `%+.2f%%`.\n\n"
+            "**How to read it.** Positive = outperforming the index; negative "
+            "= underperforming.\n\n"
             "**Reference.** Spec §5 Table 7 — `rs_vs_nifty_3m`; §6.1 Factor 2; "
-            "§6.2 MOM_RULE."
+            "§6.2 MOM_RULE; `analytics/rs_engine.py`."
         ),
     ),
     "rs_chart_top15": WidgetInfo(

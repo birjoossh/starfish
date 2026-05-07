@@ -116,14 +116,14 @@ def main():
                 if i < 3:
                     hover_text = (
                         f"1D Ret: {row['return_1d']*100:+.2f}%  |  "
-                        f"Vol: {row['vol_ratio_1d']:.1f}x  |  "
+                        f"Vol: {row['vol_ratio_1d']:.2f}x  |  "
                         f"Signal: {row['signal_category']}  |  "
-                        f"{row['drawdown_from_52w_high_pct']:.1f}% from 52W High"
+                        f"{row['drawdown_from_52w_high_pct']:+.2f}% from 52W High"
                     )
                     d_cols[i].markdown(
                         f"**{row['symbol']}**<br>"
-                        f"<span style='font-size: 0.85em; color: #4ADE80;'>ISS {row['iss_score']:.0f}</span>"
-                        f"<span style='font-size: 0.85em; color: gray;'>&nbsp;|&nbsp;{row['return_1d']*100:+.1f}%</span>",
+                        f"<span style='font-size: 0.85em; color: #4ADE80;'>ISS {row['iss_score']:.2f}</span>"
+                        f"<span style='font-size: 0.85em; color: gray;'>&nbsp;|&nbsp;{row['return_1d']*100:+.2f}%</span>",
                         unsafe_allow_html=True,
                         help=hover_text
                     )
@@ -180,7 +180,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
         
         m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Overall Breadth", f"{int(adv_total)} Adv", f"{-int(dec_total)} Dec", help=tooltip("overall_breadth"))
-        m2.metric("Average ISS", f"{components['iss_score'].mean():.0f}/100", help=tooltip("average_iss"))
+        m2.metric("Average ISS", f"{components['iss_score'].mean():.2f}/100", help=tooltip("average_iss"))
         m3.metric("Avg 1D Return", f"{avg_1d:+.2f}%", help=tooltip("avg_1d_return"))
         top_sector = sector_data.loc[sector_data["avg_return_1d"].idxmax()]["sector"] if not sector_data.empty else "N/A"
         m4.metric("Top Sector", top_sector, help=tooltip("top_sector"))
@@ -243,7 +243,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                     "sector": st.column_config.TextColumn("Sector", width="medium"),
                     "avg_return_1d": st.column_config.NumberColumn("Avg 1D %", format="%+.2f%%", help=tooltip("return_1d")),
                     "avg_return_1m": st.column_config.NumberColumn("Avg 1M %", format="%+.2f%%", help=tooltip("return_1m")),
-                    "avg_iss": st.column_config.NumberColumn("Avg ISS", format="%.0f", help=tooltip("iss_score")),
+                    "avg_iss": st.column_config.NumberColumn("Avg ISS", format="%.2f", help=tooltip("iss_score")),
                 }
             )
 
@@ -269,7 +269,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                     "Close": st.column_config.NumberColumn(format="₹%.2f"),
                     "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
                     "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                    "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                    "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
                     "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
                 }
             )
@@ -295,7 +295,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                 "Sector": st.column_config.TextColumn("Sector", width="medium"),
                 "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
                 "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
             })
 
     with c4:
@@ -313,7 +313,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                 "Sector": st.column_config.TextColumn("Sector", width="medium"),
                 "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
                 "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
             })
 
     # --- Full Master Screener ---
@@ -365,7 +365,7 @@ def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
                 "Avg Vol 20D": st.column_config.NumberColumn(help=tooltip("avg_volume_20d")),
                 "% from 52W High": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("drawdown_pct")),
                 "% from 52W Low": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("distance_from_low")),
-                "ISS": st.column_config.NumberColumn(format="%.0f", help=tooltip("iss_score")),
+                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
                 "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
                 "Momentum": st.column_config.TextColumn("Momentum", help=tooltip("momentum_flag")),
                 "Accum": st.column_config.TextColumn("Accum", help=tooltip("accumulation_flag")),

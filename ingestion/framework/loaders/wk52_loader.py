@@ -214,6 +214,9 @@ class Wk52Loader(BaseLoader):
     def _enrich_pct_columns(self, df: pd.DataFrame, trade_date: date) -> pd.DataFrame:
         """Join with fact_eod_price to compute pct_from_high and pct_from_low.
 
+        Stored as percent (matches spec §5 Table 3 and analytics.compute_52wk):
+        e.g. -22.5 means the current close sits 22.5% below the 52-week high.
+
         If no close price is available, values remain 0.0.
         """
         try:
@@ -227,11 +230,13 @@ class Wk52Loader(BaseLoader):
             df.loc[mask, "pct_from_high"] = (
                 (df.loc[mask, "close"] - df.loc[mask, "wk52_high"])
                 / df.loc[mask, "wk52_high"]
-            )
+                * 100
+            ).round(4)
             df.loc[mask, "pct_from_low"] = (
                 (df.loc[mask, "close"] - df.loc[mask, "wk52_low"])
                 / df.loc[mask, "wk52_low"]
-            )
+                * 100
+            ).round(4)
             df.drop(columns=["close"], inplace=True, errors="ignore")
         except Exception as exc:
             logger.warning(

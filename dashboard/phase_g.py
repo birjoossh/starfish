@@ -254,7 +254,7 @@ def _render_events_timeline(events_df: pd.DataFrame) -> None:
                     chg_1d = float(event["price_chg_1d"])
                     color = "green" if chg_1d >= 0 else "red"
                     st.caption(
-                        f"<span style='color: {color};'>1D: {chg_1d:+.1f}%</span>",
+                        f"<span style='color: {color};'>1D: {chg_1d:+.2f}%</span>",
                         unsafe_allow_html=True,
                     )
                 if event.get("is_upcoming"):
@@ -293,15 +293,15 @@ def _show_event_details(event: pd.Series | dict) -> None:
             if pd.notna(event.get("price_chg_1d")):
                 chg = float(event["price_chg_1d"])
                 color = "green" if chg >= 0 else "red"
-                p1.markdown(f"<span style='color: {color};'>1-day: {chg:+.1f}%</span>", unsafe_allow_html=True)
+                p1.markdown(f"<span style='color: {color};'>1-day: {chg:+.2f}%</span>", unsafe_allow_html=True)
             if pd.notna(event.get("price_chg_5d")):
                 chg = float(event["price_chg_5d"])
                 color = "green" if chg >= 0 else "red"
-                p2.markdown(f"<span style='color: {color};'>5-day: {chg:+.1f}%</span>", unsafe_allow_html=True)
+                p2.markdown(f"<span style='color: {color};'>5-day: {chg:+.2f}%</span>", unsafe_allow_html=True)
             if pd.notna(event.get("price_chg_20d")):
                 chg = float(event["price_chg_20d"])
                 color = "green" if chg >= 0 else "red"
-                p3.markdown(f"<span style='color: {color};'>20-day: {chg:+.1f}%</span>", unsafe_allow_html=True)
+                p3.markdown(f"<span style='color: {color};'>20-day: {chg:+.2f}%</span>", unsafe_allow_html=True)
 
         if event.get("follow_up_required"):
             st.warning("⚠️ Follow-up required")
@@ -426,11 +426,11 @@ def _render_watchlist_items(items: list[dict], category_name: str) -> None:
             "Company": st.column_config.TextColumn("Company", width="large"),
             "Sector": st.column_config.TextColumn("Sector", width="medium"),
             "Signal": st.column_config.TextColumn("Signal", width="small", help=tooltip("signal_category")),
-            "ISS": st.column_config.NumberColumn("ISS", format="%.0f", help=tooltip("iss_score")),
-            "1D %": st.column_config.NumberColumn("1D %", format="%.1f%%", help=tooltip("return_1d")),
-            "1M %": st.column_config.NumberColumn("1M %", format="%.1f%%", help=tooltip("return_1m")),
-            "Vol Ratio": st.column_config.NumberColumn("Vol Ratio", format="%.1fx", help=tooltip("vol_ratio_1d")),
-            "DD %": st.column_config.NumberColumn("DD %", format="%.1f%%", help=tooltip("drawdown_pct")),
+            "ISS": st.column_config.NumberColumn("ISS", format="%.2f", help=tooltip("iss_score")),
+            "1D %": st.column_config.NumberColumn("1D %", format="%.2f%%", help=tooltip("return_1d")),
+            "1M %": st.column_config.NumberColumn("1M %", format="%.2f%%", help=tooltip("return_1m")),
+            "Vol Ratio": st.column_config.NumberColumn("Vol Ratio", format="%.2fx", help=tooltip("vol_ratio_1d")),
+            "DD %": st.column_config.NumberColumn("DD %", format="%.2f%%", help=tooltip("drawdown_pct")),
         },
     )
     st.caption(
