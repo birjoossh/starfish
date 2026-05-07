@@ -37,7 +37,9 @@ def compute_52wk(trade_date: date | None = None) -> int:
     engine = get_engine()
     lookback = get_fifty_two_week_lookback()  # 252
 
-    # Load price data
+    # Load price data. The lookback window is N **distinct trading dates**,
+    # not N rows — when the universe contains hundreds of symbols, an
+    # un-distinct LIMIT collapses the window to a few hours of data.
     if trade_date:
         prices_query = text("""
             SELECT trade_date, symbol, close
@@ -45,7 +47,7 @@ def compute_52wk(trade_date: date | None = None) -> int:
             WHERE trade_date <= :end_date
               AND trade_date >= (
                   SELECT MIN(trade_date) FROM (
-                      SELECT trade_date FROM fact_eod_price
+                      SELECT DISTINCT trade_date FROM fact_eod_price
                       WHERE trade_date <= :end_date
                       ORDER BY trade_date DESC
                       LIMIT :lookback

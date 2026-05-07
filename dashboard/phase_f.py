@@ -15,7 +15,10 @@ from dashboard.widget_info import render_info, tooltip
 
 
 def load_signals_for_phase_f(calc_date: str) -> pd.DataFrame:
-    """Load one calc_date slice with all columns needed for Views 3–5."""
+    """Load one calc_date slice with all columns needed for Views 3–5.
+
+    Scoped to current Nifty 50 constituents via ``dim_stock.nifty50_member``.
+    """
     return read_sql_df(
         """
         SELECT s.calc_date, s.symbol, d.company_name, d.sector, d.market_cap_cr,
@@ -30,6 +33,7 @@ def load_signals_for_phase_f(calc_date: str) -> pd.DataFrame:
         JOIN dim_stock d ON s.symbol = d.symbol
         LEFT JOIN fact_eod_price p ON s.symbol = p.symbol AND s.calc_date = p.trade_date
         WHERE s.calc_date = :calc_date
+          AND d.nifty50_member = TRUE
         ORDER BY s.drawdown_from_52w_high_pct ASC, s.symbol
         """,
         params={"calc_date": calc_date},
