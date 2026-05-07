@@ -1,0 +1,246 @@
+- generic:
+  - generic [ref=e3]:
+    - banner [ref=e6]:
+      - generic [ref=e9]:
+        - button "Deploy" [ref=e11] [cursor=pointer]:
+          - generic [ref=e13]: Deploy
+        - button "Main menu" [ref=e15] [cursor=pointer]:
+          - img [ref=e16]
+    - generic [ref=e19]:
+      - img [ref=e24]
+      - generic [ref=e26]:
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - generic [ref=e34]: 2026-05-05
+            - combobox "Selected 2026-05-05. Date" [ref=e36]
+          - img "open" [ref=e38]
+        - generic [ref=e41]:
+          - paragraph [ref=e46]:
+            - text: ☀️
+            - strong [ref=e47]: Morning Digest
+            - text: — Top 3 by ISS Score
+            - button "Help" [ref=e52] [cursor=pointer]:
+              - img [ref=e53]
+          - generic [ref=e57]:
+            - paragraph [ref=e64]:
+              - strong [ref=e65]: CEIGALL
+              - text: ISS 64.00 | +2.05%
+              - button "Help" [ref=e70] [cursor=pointer]:
+                - img [ref=e71]
+            - paragraph [ref=e80]:
+              - strong [ref=e81]: DHAMPURSUG
+              - text: ISS 63.00 | +3.41%
+              - button "Help" [ref=e86] [cursor=pointer]:
+                - img [ref=e87]
+            - paragraph [ref=e96]:
+              - strong [ref=e97]: CREDITACC
+              - text: ISS 62.00 | +15.41%
+              - button "Help" [ref=e102] [cursor=pointer]:
+                - img [ref=e103]
+      - separator [ref=e110]
+      - generic [ref=e112]:
+        - tablist [ref=e114]:
+          - tab "Overview" [ref=e115] [cursor=pointer]:
+            - paragraph [ref=e117]: Overview
+          - tab "Drawdown" [active] [selected] [ref=e118] [cursor=pointer]:
+            - paragraph [ref=e120]: Drawdown
+          - tab "Momentum" [ref=e121] [cursor=pointer]:
+            - paragraph [ref=e123]: Momentum
+          - tab "Volume" [ref=e124] [cursor=pointer]:
+            - paragraph [ref=e126]: Volume
+          - tab "Events" [ref=e127] [cursor=pointer]:
+            - paragraph [ref=e129]: Events
+          - tab "Watchlist" [ref=e130] [cursor=pointer]:
+            - paragraph [ref=e132]: Watchlist
+        - tabpanel "Drawdown" [ref=e475]:
+          - generic [ref=e476]:
+            - heading "View 3 · Drawdown Scanner" [level=3] [ref=e481]:
+              - text: View 3 · Drawdown Scanner
+              - generic [ref=e482]:
+                - link "Link to heading":
+                  - /url: "#view-3-drawdown-scanner"
+                  - img
+            - group [ref=e485]:
+              - 'generic "keyboard_arrow_right ℹ️ About: View 3 — Drawdown Scanner" [ref=e486] [cursor=pointer]':
+                - generic [ref=e487]:
+                  - generic [ref=e489]: keyboard_arrow_right
+                  - paragraph [ref=e492]: "ℹ️ About: View 3 — Drawdown Scanner"
+            - generic [ref=e494]:
+              - generic [ref=e499]:
+                - generic [ref=e500]:
+                  - paragraph [ref=e503]: Min drawdown from 52W high (%)
+                  - button "Help for Min drawdown from 52W high (%)" [ref=e507] [cursor=pointer]:
+                    - img [ref=e508]
+                - generic [ref=e511]:
+                  - slider "Min drawdown from 52W high (%)" [ref=e515]:
+                    - generic:
+                      - generic:
+                        - paragraph: "-20"
+                  - generic:
+                    - generic:
+                      - paragraph: "-50"
+                    - generic:
+                      - paragraph: "-10"
+              - generic [ref=e520]:
+                - paragraph [ref=e524]: Sectors
+                - generic [ref=e527]:
+                  - generic [ref=e528]:
+                    - button "Aerospace & Defence, close by backspace":
+                      - generic "Aerospace & Defence" [ref=e529]
+                      - img [ref=e531] [cursor=pointer]
+                    - button "Automobile, close by backspace":
+                      - generic "Automobile" [ref=e533]
+                      - img [ref=e535] [cursor=pointer]
+                    - button "Automobile and Auto Components, close by backspace":
+                      - generic "Automobile and Auto Components" [ref=e537]
+                      - img [ref=e539] [cursor=pointer]
+                    - button "Construction, close by backspace":
+                      - generic "Construction" [ref=e541]
+                      - img [ref=e543] [cursor=pointer]
+                    - button "Construction Materials, close by backspace":
+                      - generic "Construction Materials" [ref=e545]
+                      - img [ref=e547] [cursor=pointer]
+                    - button "Consumer Discretionary, close by backspace":
+                      - generic "Consumer Discretionary" [ref=e549]
+                      - img [ref=e551] [cursor=pointer]
+                    - button "Consumer Durables, close by backspace":
+                      - generic "Consumer Durables" [ref=e553]
+                      - img [ref=e555] [cursor=pointer]
+                    - button "Fast Moving Consumer Goods, close by backspace":
+                      - generic "Fast Moving Consumer Goods" [ref=e557]
+                      - img [ref=e559] [cursor=pointer]
+                    - button "Financial Services, close by backspace":
+                      - generic "Financial Services" [ref=e561]
+                      - img [ref=e563] [cursor=pointer]
+                    - button "Healthcare, close by backspace":
+                      - generic "Healthcare" [ref=e565]
+                      - img [ref=e567] [cursor=pointer]
+                    - button "Information Technology, close by backspace":
+                      - generic "Information Technology" [ref=e569]
+                      - img [ref=e571] [cursor=pointer]
+                    - button "Materials, close by backspace":
+                      - generic "Materials" [ref=e573]
+                      - img [ref=e575] [cursor=pointer]
+                    - button "Metals & Mining, close by backspace":
+                      - generic "Metals & Mining" [ref=e577]
+                      - img [ref=e579] [cursor=pointer]
+                    - button "N/A, close by backspace":
+                      - generic "N/A" [ref=e581]
+                      - img [ref=e583] [cursor=pointer]
+                    - button "Oil Gas & Consumable Fuels, close by backspace":
+                      - generic "Oil Gas & Consumable Fuels" [ref=e585]
+                      - img [ref=e587] [cursor=pointer]
+                    - button "Power, close by backspace":
+                      - generic "Power" [ref=e589]
+                      - img [ref=e591] [cursor=pointer]
+                    - button "Services, close by backspace":
+                      - generic "Services" [ref=e593]
+                      - img [ref=e595] [cursor=pointer]
+                    - button "Technology, close by backspace":
+                      - generic "Technology" [ref=e597]
+                      - img [ref=e599] [cursor=pointer]
+                    - button "Telecommunication, close by backspace":
+                      - generic "Telecommunication" [ref=e601]
+                      - img [ref=e603] [cursor=pointer]
+                    - button "Unknown, close by backspace":
+                      - generic "Unknown" [ref=e605]
+                      - img [ref=e607] [cursor=pointer]
+                    - combobox "Selected Aerospace & Defence, Automobile, Automobile and Auto Components, Construction, Construction Materials, Consumer Discretionary, Consumer Durables, Fast Moving Consumer Goods, Financial Services, Healthcare, Information Technology, Materials, Metals & Mining, N/A, Oil Gas & Consumable Fuels, Power, Services, Technology, Telecommunication, Unknown. Sectors" [ref=e610]
+                  - generic [ref=e611]:
+                    - button "Clear all" [ref=e612] [cursor=pointer]
+                    - img "open" [ref=e614] [cursor=pointer]
+              - generic [ref=e617]:
+                - generic [ref=e620]:
+                  - generic [ref=e621]:
+                    - paragraph [ref=e623]: Names ≤ threshold
+                    - button "Help for Names ≤ threshold" [ref=e627] [cursor=pointer]:
+                      - img [ref=e628]
+                  - paragraph [ref=e633]: "1460"
+                - generic [ref=e636]:
+                  - generic [ref=e637]:
+                    - paragraph [ref=e639]: Avg drawdown (all filtered)
+                    - button "Help for Avg drawdown (all filtered)" [ref=e643] [cursor=pointer]:
+                      - img [ref=e644]
+                  - paragraph [ref=e649]: "-24.79%"
+            - generic [ref=e654]:
+              - button "Show/hide columns" [ref=e658] [cursor=pointer]:
+                - img [ref=e659]
+              - button "Download as CSV" [ref=e664] [cursor=pointer]:
+                - img [ref=e665]
+              - button "Search" [ref=e670] [cursor=pointer]:
+                - img [ref=e671]
+              - button "Fullscreen" [ref=e676] [cursor=pointer]:
+                - img [ref=e677]
+            - paragraph [ref=e692]:
+              - text: "Tag legend:"
+              - strong [ref=e693]: Potential Accumulation
+              - text: = contracting volume / ACC bias ·
+              - strong [ref=e694]: Falling Knife Risk
+              - text: = expanding volume or EventDriven ·
+              - strong [ref=e695]: Needs Event Review
+              - text: = event flag or mixed setup.
+            - group [ref=e698]:
+              - 'generic "keyboard_arrow_right ℹ️ About: Drawdown Tag — full rules" [ref=e699] [cursor=pointer]':
+                - generic [ref=e700]:
+                  - generic [ref=e702]: keyboard_arrow_right
+                  - paragraph [ref=e705]: "ℹ️ About: Drawdown Tag — full rules"
+            - generic [ref=e711]:
+              - img:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic: "0"
+                      - generic:
+                        - generic: "200"
+                      - generic:
+                        - generic: "400"
+                      - generic:
+                        - generic: "600"
+                      - generic:
+                        - generic: "800"
+                      - generic:
+                        - generic: "1000"
+                    - generic:
+                      - generic:
+                        - generic: −100
+                      - generic:
+                        - generic: −80
+                      - generic:
+                        - generic: −60
+                      - generic:
+                        - generic: −40
+                      - generic:
+                        - generic: −20
+              - img:
+                - generic:
+                  - generic [ref=e727]:
+                    - generic [ref=e728]: signal_category
+                    - generic [ref=e731]: Neutral
+                    - generic [ref=e739]: EventDriven
+                    - generic [ref=e747]: Accumulation
+                  - generic:
+                    - generic: Distance from 52W low %
+                  - generic:
+                    - generic: Drawdown from 52W high %
+              - toolbar [ref=e753]:
+                - button "Download plot as a PNG" [ref=e755] [cursor=pointer]:
+                  - img [ref=e756]
+                - generic [ref=e758]:
+                  - button "Zoom" [ref=e759] [cursor=pointer]:
+                    - img [ref=e760]
+                  - button "Pan" [ref=e762] [cursor=pointer]:
+                    - img [ref=e763]
+                - generic [ref=e765]:
+                  - button "Zoom in" [ref=e766] [cursor=pointer]:
+                    - img [ref=e767]
+                  - button "Zoom out" [ref=e769] [cursor=pointer]:
+                    - img [ref=e770]
+                  - button "Autoscale" [ref=e772] [cursor=pointer]:
+                    - img [ref=e773]
+                  - button "Reset axes" [ref=e775] [cursor=pointer]:
+                    - img [ref=e776]
+                - button "Fullscreen" [ref=e779] [cursor=pointer]:
+                  - img [ref=e780]
+              - img
+  - img [ref=e473]
