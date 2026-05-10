@@ -214,11 +214,27 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
     """View 4: Active momentum, near-breakout radar, RS chart."""
     st.subheader("View 4 · Breakout & Momentum Monitor")
 
-    mom = df[(df["momentum_flag"] == True) | (df["signal_category"] == "Momentum")].copy()
-    mom["MOM tier"] = mom["iss_score"].apply(lambda x: momentum_tier_label(float(x)))
-
     st.markdown("#### Active momentum (MOM flag or Momentum category)")
     render_info("momentum_active")
+    mom_iss_floor = st.slider(
+        "Min ISS score (also include any name above this)",
+        min_value=0,
+        max_value=100,
+        value=50,
+        step=1,
+        key="momentum_active_iss",
+        help=(
+            "Default keeps flag/category-based momentum names. Lower this to also include "
+            "names whose ISS reaches the chosen floor — useful when running on a short-history "
+            "dataset where the MOM flag rarely fires."
+        ),
+    )
+    mom = df[
+        (df["momentum_flag"] == True)
+        | (df["signal_category"] == "Momentum")
+        | (df["iss_score"] >= mom_iss_floor)
+    ].copy()
+    mom["MOM tier"] = mom["iss_score"].apply(lambda x: momentum_tier_label(float(x)))
     if mom.empty:
         st.info("No momentum-flagged names on this date.")
     else:
@@ -274,12 +290,35 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
         )
 
     st.markdown("#### Near-breakout radar")
-    st.caption("Within ~5% of 52W high, ISS ≥ 50, not yet MOM-flagged.")
     render_info("breakout_radar")
+    near_c1, near_c2 = st.columns(2)
+    with near_c1:
+        near_pct = st.slider(
+            "Distance from 52W high (%)",
+            min_value=1.0,
+            max_value=25.0,
+            value=5.0,
+            step=0.5,
+            key="near_breakout_pct",
+            help="Stocks whose close is within this percent of their 52W high.",
+        )
+    with near_c2:
+        iss_floor = st.slider(
+            "Min ISS score",
+            min_value=0,
+            max_value=100,
+            value=50,
+            step=1,
+            key="near_breakout_iss",
+            help="Lower this when running against a short-history dataset where ISS scores cap below 50.",
+        )
+    st.caption(
+        f"Within ~{near_pct:g}% of 52W high, ISS ≥ {iss_floor}, not yet MOM-flagged."
+    )
     near = df[
         (~df["momentum_flag"])
-        & (df["drawdown_from_52w_high_pct"] >= -5.0)
-        & (df["iss_score"] >= 50)
+        & (df["drawdown_from_52w_high_pct"] >= -near_pct)
+        & (df["iss_score"] >= iss_floor)
     ].sort_values("drawdown_from_52w_high_pct", ascending=False)
     if near.empty:
         st.info("No names match the near-breakout filter.")
@@ -301,9 +340,18 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
             },
         )
 
-    st.markdown("#### RS vs Nifty (3M) — top 15")
+    st.markdown("#### RS vs Nifty (3M)")
     render_info("rs_chart_top15")
-    top = df.nlargest(15, "rs_vs_nifty_3m").copy()
+    rs_top_n = st.slider(
+        "Top N by RS vs Nifty (3M)",
+        min_value=5,
+        max_value=50,
+        value=15,
+        step=1,
+        key="rs_chart_top_n",
+        help="How many leading names (by 3M relative strength vs Nifty) to chart.",
+    )
+    top = df.nlargest(rs_top_n, "rs_vs_nifty_3m").copy()
     if not top.empty:
         top["rs_pct"] = top["rs_vs_nifty_3m"].astype(float) * 100.0
         fig = px.bar(
@@ -313,7 +361,7 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
             orientation="h",
             color="rs_pct",
             color_continuous_scale="RdYlGn",
-            height=420,
+            height=max(280, 28 * rs_top_n),
         )
         fig.add_vline(x=0, line_dash="dash", line_color="gray")
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", yaxis_title="", xaxis_title="RS vs Nifty 3M (%)")
