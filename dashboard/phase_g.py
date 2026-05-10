@@ -16,6 +16,7 @@ import requests
 import streamlit as st
 
 from config.database import read_sql_df
+from dashboard.widget_info import render_info, tooltip
 
 API_URL = "http://localhost:8000/api/v1"
 
@@ -157,6 +158,7 @@ def render_events_tracker() -> None:
     for Nifty 50 companies, with pre- and post-event price context.
     """
     st.subheader("View 6 · Corporate Events Tracker")
+    render_info("events_view")
 
     # Row 1: Filters
     c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
@@ -186,6 +188,7 @@ def render_events_tracker() -> None:
             "Min Significance",
             1, 5, 2,
             label_visibility="collapsed",
+            help=tooltip("events_significance"),
         )
 
     # Load events
@@ -207,13 +210,14 @@ def render_events_tracker() -> None:
     high_sig = events_df[events_df["significance"] >= 4].shape[0]
 
     s1, s2, s3, s4 = st.columns(4)
-    s1.metric("Total Events", len(events_df))
-    s2.metric("Upcoming", upcoming)
-    s3.metric("Recent (Past 30d)", recent)
-    s4.metric("High Significance (>=4)", high_sig)
+    s1.metric("Total Events", len(events_df), help=tooltip("events_total"))
+    s2.metric("Upcoming", upcoming, help=tooltip("events_upcoming"))
+    s3.metric("Recent (Past 30d)", recent, help=tooltip("events_recent"))
+    s4.metric("High Significance (>=4)", high_sig, help=tooltip("events_high_sig"))
 
     # Timeline view
     st.markdown("#### Timeline")
+    render_info("events_timeline")
     _render_events_timeline(events_df)
 
 
@@ -250,7 +254,7 @@ def _render_events_timeline(events_df: pd.DataFrame) -> None:
                     chg_1d = float(event["price_chg_1d"])
                     color = "green" if chg_1d >= 0 else "red"
                     st.caption(
-                        f"<span style='color: {color};'>1D: {chg_1d:+.1f}%</span>",
+                        f"<span style='color: {color};'>1D: {chg_1d:+.2f}%</span>",
                         unsafe_allow_html=True,
                     )
                 if event.get("is_upcoming"):
@@ -284,19 +288,20 @@ def _show_event_details(event: pd.Series | dict) -> None:
         # Price impact
         if pd.notna(event.get("price_chg_1d")) or pd.notna(event.get("price_chg_5d")) or pd.notna(event.get("price_chg_20d")):
             st.write("**Price Impact**")
+            render_info("events_price_impact")
             p1, p2, p3 = st.columns(3)
             if pd.notna(event.get("price_chg_1d")):
                 chg = float(event["price_chg_1d"])
                 color = "green" if chg >= 0 else "red"
-                p1.markdown(f"<span style='color: {color};'>1-day: {chg:+.1f}%</span>", unsafe_allow_html=True)
+                p1.markdown(f"<span style='color: {color};'>1-day: {chg:+.2f}%</span>", unsafe_allow_html=True)
             if pd.notna(event.get("price_chg_5d")):
                 chg = float(event["price_chg_5d"])
                 color = "green" if chg >= 0 else "red"
-                p2.markdown(f"<span style='color: {color};'>5-day: {chg:+.1f}%</span>", unsafe_allow_html=True)
+                p2.markdown(f"<span style='color: {color};'>5-day: {chg:+.2f}%</span>", unsafe_allow_html=True)
             if pd.notna(event.get("price_chg_20d")):
                 chg = float(event["price_chg_20d"])
                 color = "green" if chg >= 0 else "red"
-                p3.markdown(f"<span style='color: {color};'>20-day: {chg:+.1f}%</span>", unsafe_allow_html=True)
+                p3.markdown(f"<span style='color: {color};'>20-day: {chg:+.2f}%</span>", unsafe_allow_html=True)
 
         if event.get("follow_up_required"):
             st.warning("⚠️ Follow-up required")
@@ -326,6 +331,7 @@ def render_watchlist_builder() -> None:
     scoring system.
     """
     st.subheader("View 7 · Watchlist Builder")
+    render_info("watchlist_builder")
 
     # Load suggestions
     suggestions = load_category_suggestions()
@@ -342,6 +348,14 @@ def render_watchlist_builder() -> None:
         "Volume-Confirmed Movers",
     ])
 
+    # Per-tab info keys (positional, mirrors the tabs list above).
+    _category_info_keys = (
+        "watchlist_contrarian",
+        "watchlist_momentum",
+        "watchlist_event",
+        "watchlist_volume",
+    )
+
     # Display each category (Row 2)
     for i, (tab, suggestion) in enumerate(zip(tabs, suggestions)):
         with tab:
@@ -350,6 +364,8 @@ def render_watchlist_builder() -> None:
 
             st.markdown(f"#### {category_name}")
             st.caption(f"Showing {len(items)} candidates")
+            if i < len(_category_info_keys):
+                render_info(_category_info_keys[i])
 
             if not items:
                 st.info("No candidates match this category's criteria.")
@@ -409,14 +425,18 @@ def _render_watchlist_items(items: list[dict], category_name: str) -> None:
             "Symbol": st.column_config.TextColumn("Symbol", width="medium"),
             "Company": st.column_config.TextColumn("Company", width="large"),
             "Sector": st.column_config.TextColumn("Sector", width="medium"),
-            "Signal": st.column_config.TextColumn("Signal", width="small"),
-            "ISS": st.column_config.NumberColumn("ISS", format="%.0f"),
-            "1D %": st.column_config.NumberColumn("1D %", format="%.1f%%"),
-            "1M %": st.column_config.NumberColumn("1M %", format="%.1f%%"),
-            "Vol Ratio": st.column_config.NumberColumn("Vol Ratio", format="%.1fx"),
-            "DD %": st.column_config.NumberColumn("DD %", format="%.1f%%"),
+            "Signal": st.column_config.TextColumn("Signal", width="small", help=tooltip("signal_category")),
+            "ISS": st.column_config.NumberColumn("ISS", format="%.2f", help=tooltip("iss_score")),
+            "1D %": st.column_config.NumberColumn("1D %", format="%.2f%%", help=tooltip("return_1d")),
+            "1M %": st.column_config.NumberColumn("1M %", format="%.2f%%", help=tooltip("return_1m")),
+            "Vol Ratio": st.column_config.NumberColumn("Vol Ratio", format="%.2fx", help=tooltip("vol_ratio_1d")),
+            "DD %": st.column_config.NumberColumn("DD %", format="%.2f%%", help=tooltip("drawdown_pct")),
         },
     )
+    st.caption(
+        "ISS badge tiers: 0–39 red · 40–59 amber · 60–79 green · 80–100 deep green."
+    )
+    render_info("watchlist_iss_badge")
 
 
 # ============================================================

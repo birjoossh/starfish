@@ -1,0 +1,18 @@
+[
+  {
+    "symbol": "SHREMINVIT",
+    "company": "Shrem Invit",
+    "purpose": "Financial Results",
+    "bm_desc": "To consider and approve the audited financial results (standalone and consolidated) of the Shrem InvIT for the quarter ended and year ended March 31, 2026 and declaration of distribution.",
+    "date": "09-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  },
+  {
+    "symbol": "NXST",
+    "company": "Nexus Select Trust",
+    "purpose": "Other business matters",
+    "bm_desc": "To consider other business matters",
+    "date": "12-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  }
+]

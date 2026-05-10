@@ -33395,16 +33395,58 @@ NIFTY50_SEED = [
 ]
 
 
-def seed_dim_stock() -> int:
-    """Insert Nifty 50 constituents into dim_stock.
+def _real_nifty50_seed() -> list[dict]:
+    """Return only the genuine Nifty 50 constituents from ``NIFTY50_SEED``.
 
-    Idempotent: uses ON CONFLICT DO UPDATE to refresh metadata.
+    The list at the top of this module accumulated duplicates over time —
+    every real Nifty 50 symbol has a second entry later in the file with
+    ``sector="N/A"`` (mistakenly inherited from the broader NSE universe
+    seed). Because :func:`seed_dim_stock` runs ``ON CONFLICT DO UPDATE``,
+    the duplicate would always overwrite the good row's sector with "N/A"
+    and flip ``nifty50_member`` on for every symbol in the file (~6 000
+    of them).
+
+    This helper:
+      * keeps **only** entries with a real sector (anything other than
+        ``N/A``), which is the marker for hand-curated Nifty 50 rows.
+      * dedupes on ``symbol``, keeping the first occurrence.
+    """
+    seen: set[str] = set()
+    keep: list[dict] = []
+    for row in NIFTY50_SEED:
+        symbol = row.get("symbol")
+        sector = (row.get("sector") or "").strip()
+        if not symbol or sector in ("", "N/A"):
+            continue
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+        keep.append(row)
+    return keep
+
+
+def seed_dim_stock() -> int:
+    """Insert Nifty 50 constituents into ``dim_stock``.
+
+    Two-step procedure:
+
+      1. Reset ``nifty50_member = FALSE`` across the whole table so that
+         any stale flags from a previous bloated seed run are cleared.
+      2. Upsert the real Nifty 50 rows with ``nifty50_member = TRUE`` and
+         the curated sector / industry metadata.
+
+    Idempotent: uses ``ON CONFLICT DO UPDATE`` to refresh metadata.
 
     Returns:
         Number of rows upserted.
     """
     engine = get_engine()
     now = datetime.now()
+
+    reset_sql = text(
+        "UPDATE dim_stock SET nifty50_member = FALSE "
+        "WHERE nifty50_member = TRUE"
+    )
 
     upsert_sql = text("""
         INSERT INTO dim_stock (
@@ -33424,9 +33466,16 @@ def seed_dim_stock() -> int:
             last_updated = :now
     """)
 
+    rows = _real_nifty50_seed()
+
     count = 0
     with engine.connect() as conn:
-        for stock in NIFTY50_SEED:
+        reset = conn.execute(reset_sql)
+        logger.info(
+            "Reset nifty50_member=FALSE for %d previously-flagged rows",
+            reset.rowcount or 0,
+        )
+        for stock in rows:
             stock["now"] = now
             conn.execute(upsert_sql, stock)
             count += 1

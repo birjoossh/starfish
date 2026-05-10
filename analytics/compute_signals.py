@@ -18,6 +18,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from config.database import get_engine
+from analytics.corp_action_adjuster import adjust_prices
 from analytics.returns_engine import compute_returns
 from analytics.volume_engine import compute_volume
 from analytics.compute_52wk import compute_52wk
@@ -157,6 +158,11 @@ def compute_signals(trade_date: date | None = None) -> int:
     if prices_df.empty:
         logger.warning("No price data found, skipping signal computation")
         return 0
+
+    # Apply split/bonus back-adjustment so OHLC and prev_close are economically
+    # comparable across ex-dates. Volume is left raw — share-count adjustment
+    # for volume is a separate concern.
+    prices_df = adjust_prices(prices_df)
 
     logger.info(f"Loaded {len(prices_df)} price rows for {prices_df['symbol'].nunique()} symbols")
 

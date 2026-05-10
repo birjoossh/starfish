@@ -1,0 +1,201 @@
+- generic:
+  - generic [ref=e3]:
+    - banner [ref=e6]:
+      - generic [ref=e9]:
+        - button "Deploy" [ref=e19] [cursor=pointer]:
+          - generic [ref=e21]: Deploy
+        - button "Main menu" [ref=e23] [cursor=pointer]:
+          - img [ref=e24]
+    - generic [ref=e27]:
+      - img [ref=e32]
+      - generic [ref=e34]:
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]: 2026-05-08
+            - combobox "Selected 2026-05-08. Date" [ref=e44]
+          - img "open" [ref=e46]
+        - generic [ref=e49]:
+          - paragraph [ref=e54]:
+            - text: ☀️
+            - strong [ref=e55]: Morning Digest
+            - text: — Top 3 by ISS Score
+            - button "Help" [ref=e60] [cursor=pointer]:
+              - img [ref=e61]
+          - generic [ref=e65]:
+            - paragraph [ref=e72]:
+              - strong [ref=e73]: APOLLOHOSP
+              - text: ISS 36.00 | +3.32%
+              - button "Help" [ref=e78] [cursor=pointer]:
+                - img [ref=e79]
+            - paragraph [ref=e88]:
+              - strong [ref=e89]: ASIANPAINT
+              - text: ISS 36.00 | +2.74%
+              - button "Help" [ref=e94] [cursor=pointer]:
+                - img [ref=e95]
+            - paragraph [ref=e104]:
+              - strong [ref=e105]: ADANIPORTS
+              - text: ISS 35.00 | +1.59%
+              - button "Help" [ref=e110] [cursor=pointer]:
+                - img [ref=e111]
+      - separator [ref=e118]
+      - generic [ref=e120]:
+        - tablist [ref=e122]:
+          - tab "Overview" [ref=e123] [cursor=pointer]:
+            - paragraph [ref=e125]: Overview
+          - tab "Drawdown" [ref=e126] [cursor=pointer]:
+            - paragraph [ref=e128]: Drawdown
+          - tab "Momentum" [active] [selected] [ref=e129] [cursor=pointer]:
+            - paragraph [ref=e131]: Momentum
+          - tab "Volume" [ref=e132] [cursor=pointer]:
+            - paragraph [ref=e134]: Volume
+          - tab "Events" [ref=e135] [cursor=pointer]:
+            - paragraph [ref=e137]: Events
+          - tab "Watchlist" [ref=e138] [cursor=pointer]:
+            - paragraph [ref=e140]: Watchlist
+        - tabpanel "Momentum" [ref=e312]:
+          - generic [ref=e313]:
+            - heading "View 4 · Breakout & Momentum Monitor" [level=3] [ref=e318]:
+              - text: View 4 · Breakout & Momentum Monitor
+              - generic [ref=e319]:
+                - link "Link to heading":
+                  - /url: "#view-4-breakout-and-momentum-monitor"
+                  - img
+            - heading "Active momentum (MOM flag or Momentum category)" [level=4] [ref=e325]:
+              - text: Active momentum (MOM flag or Momentum category)
+              - generic [ref=e326]:
+                - link "Link to heading":
+                  - /url: "#active-momentum-mom-flag-or-momentum-category"
+                  - img
+            - group [ref=e329]:
+              - 'generic "keyboard_arrow_right ℹ️ About: Active momentum" [ref=e330] [cursor=pointer]':
+                - generic [ref=e331]:
+                  - generic [ref=e333]: keyboard_arrow_right
+                  - paragraph [ref=e336]: "ℹ️ About: Active momentum"
+            - alert [ref=e339]:
+              - paragraph [ref=e344]: No momentum-flagged names on this date.
+            - heading "Near-breakout radar" [level=4] [ref=e350]:
+              - text: Near-breakout radar
+              - generic [ref=e351]:
+                - link "Link to heading":
+                  - /url: "#near-breakout-radar"
+                  - img
+            - group [ref=e354]:
+              - 'generic "keyboard_arrow_right ℹ️ About: Near-breakout radar" [ref=e355] [cursor=pointer]':
+                - generic [ref=e356]:
+                  - generic [ref=e358]: keyboard_arrow_right
+                  - paragraph [ref=e361]: "ℹ️ About: Near-breakout radar"
+            - generic [ref=e364]:
+              - generic [ref=e365]:
+                - paragraph [ref=e368]: Distance from 52W high (%)
+                - button "Help for Distance from 52W high (%)" [ref=e372] [cursor=pointer]:
+                  - img [ref=e373]
+              - generic [ref=e376]:
+                - slider "Distance from 52W high (%)" [ref=e380]:
+                  - generic:
+                    - generic:
+                      - paragraph: "5.00"
+                - generic:
+                  - generic:
+                    - paragraph: "1.00"
+                  - generic:
+                    - paragraph: "25.00"
+            - paragraph [ref=e386]: Within ~5% of 52W high, ISS ≥ 50, not yet MOM-flagged.
+            - alert [ref=e389]:
+              - paragraph [ref=e394]: No names match the near-breakout filter.
+            - heading "RS vs Nifty (3M) — top 15" [level=4] [ref=e400]:
+              - text: RS vs Nifty (3M) — top 15
+              - generic [ref=e401]:
+                - link "Link to heading":
+                  - /url: "#rs-vs-nifty-3-m-top-15"
+                  - img
+            - group [ref=e404]:
+              - 'generic "keyboard_arrow_right ℹ️ About: RS vs Nifty (3M) — top 15" [ref=e405] [cursor=pointer]':
+                - generic [ref=e406]:
+                  - generic [ref=e408]: keyboard_arrow_right
+                  - paragraph [ref=e411]: "ℹ️ About: RS vs Nifty (3M) — top 15"
+            - generic [ref=e417]:
+              - img:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic: −1
+                      - generic:
+                        - generic: −0.5
+                      - generic:
+                        - generic: "0"
+                      - generic:
+                        - generic: "0.5"
+                      - generic:
+                        - generic: "1"
+                    - generic:
+                      - generic:
+                        - generic: HCLTECH
+                      - generic:
+                        - generic: INFY
+                      - generic:
+                        - generic: ICICIBANK
+                      - generic:
+                        - generic: SBIN
+                      - generic:
+                        - generic: TCS
+                      - generic:
+                        - generic: AXISBANK
+                      - generic:
+                        - generic: HDFCBANK
+                      - generic:
+                        - generic: ONGC
+                      - generic:
+                        - generic: BPCL
+                      - generic:
+                        - generic: BRITANNIA
+                      - generic:
+                        - generic: WIPRO
+                      - generic:
+                        - generic: SBILIFE
+                      - generic:
+                        - generic: COALINDIA
+                      - generic:
+                        - generic: BEL
+                      - generic:
+                        - generic: HEROMOTOCO
+              - img:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic: −0.4
+                      - generic:
+                        - generic: −0.2
+                      - generic:
+                        - generic: "0"
+                      - generic:
+                        - generic: "0.2"
+                      - generic:
+                        - generic: "0.4"
+                    - generic:
+                      - generic:
+                        - generic: rs_pct
+                  - generic:
+                    - generic: RS vs Nifty 3M (%)
+              - toolbar [ref=e431]:
+                - button "Download plot as a PNG" [ref=e433] [cursor=pointer]:
+                  - img [ref=e434]
+                - generic [ref=e436]:
+                  - button "Zoom" [ref=e437] [cursor=pointer]:
+                    - img [ref=e438]
+                  - button "Pan" [ref=e440] [cursor=pointer]:
+                    - img [ref=e441]
+                - generic [ref=e443]:
+                  - button "Zoom in" [ref=e444] [cursor=pointer]:
+                    - img [ref=e445]
+                  - button "Zoom out" [ref=e447] [cursor=pointer]:
+                    - img [ref=e448]
+                  - button "Autoscale" [ref=e450] [cursor=pointer]:
+                    - img [ref=e451]
+                  - button "Reset axes" [ref=e453] [cursor=pointer]:
+                    - img [ref=e454]
+                - button "Fullscreen" [ref=e457] [cursor=pointer]:
+                  - img [ref=e458]
+              - img
+  - img [ref=e460]

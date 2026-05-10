@@ -1,0 +1,50 @@
+[
+  {
+    "symbol": "INDUSINVIT",
+    "company": "Indus Infra Trust",
+    "purpose": "Fund Raising",
+    "bm_desc": "To consider Fund Raising",
+    "date": "12-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  },
+  {
+    "symbol": "INDUSINVIT",
+    "company": "Indus Infra Trust",
+    "purpose": "Fund Raising",
+    "bm_desc": "Update on the Board Meeting scheduled to be held on Tuesday, 12th May 2026 to consider Fund Raising",
+    "date": "12-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  },
+  {
+    "symbol": "NXST",
+    "company": "Nexus Select Trust",
+    "purpose": "Other business matters",
+    "bm_desc": "To consider other business matters",
+    "date": "12-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  },
+  {
+    "symbol": "NHIT",
+    "company": "National Highways Infra Trust",
+    "purpose": "Other business matters",
+    "bm_desc": "To consider Annual Audited Standalone and Consolidated Financial Statements along with quarterly and Annual Results of NHIT and Declaration of distributions, if any to be paid to Unitholders for the period ended February and March, 2026.",
+    "date": "13-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  },
+  {
+    "symbol": "INDIGRID",
+    "company": "IndiGrid Infrastructure Trust",
+    "purpose": "Financial Results/Fund Raising/Other business matters",
+    "bm_desc": "Intimation of Meeting of Board of Directors of IndiGrid Investment Managers Limited, the Investment Manager of IndiGrid Infrastructure Trust scheduled to be held on Thursday, May 14, 2026",
+    "date": "14-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  },
+  {
+    "symbol": "TVSINVIT",
+    "company": "TVS Infrastructure Trust",
+    "purpose": "Financial Results/Other business matters",
+    "bm_desc": "To consider and approve the financial results for the quarter and year ended March 31, 2026 inter alia other business matters.",
+    "date": "14-May-2026",
+    "_drop_reason": "symbol not in dim_stock (FK violation would occur)"
+  }
+]

@@ -1,0 +1,113 @@
+- generic:
+  - generic [ref=e3]:
+    - banner [ref=e6]:
+      - generic [ref=e9]:
+        - button "Deploy" [ref=e11] [cursor=pointer]:
+          - generic [ref=e13]: Deploy
+        - button "Main menu" [ref=e15] [cursor=pointer]:
+          - img [ref=e16]
+    - generic [ref=e19]:
+      - img [ref=e24]
+      - generic [ref=e26]:
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - generic [ref=e34]: 2026-05-05
+            - combobox "Selected 2026-05-05. Date" [ref=e36]
+          - img "open" [ref=e38]
+        - generic [ref=e41]:
+          - paragraph [ref=e46]:
+            - text: ☀️
+            - strong [ref=e47]: Morning Digest
+            - text: — Top 3 by ISS Score
+            - button "Help" [ref=e52] [cursor=pointer]:
+              - img [ref=e53]
+          - generic [ref=e57]:
+            - paragraph [ref=e64]:
+              - strong [ref=e65]: CEIGALL
+              - text: ISS 59.00 | +2.05%
+              - button "Help" [ref=e70] [cursor=pointer]:
+                - img [ref=e71]
+            - paragraph [ref=e80]:
+              - strong [ref=e81]: DHAMPURSUG
+              - text: ISS 58.00 | +3.41%
+              - button "Help" [ref=e86] [cursor=pointer]:
+                - img [ref=e87]
+            - paragraph [ref=e96]:
+              - strong [ref=e97]: CREDITACC
+              - text: ISS 57.00 | +15.41%
+              - button "Help" [ref=e102] [cursor=pointer]:
+                - img [ref=e103]
+      - separator [ref=e110]
+      - generic [ref=e112]:
+        - tablist [ref=e114]:
+          - tab "Overview" [ref=e115] [cursor=pointer]:
+            - paragraph [ref=e117]: Overview
+          - tab "Drawdown" [active] [selected] [ref=e118] [cursor=pointer]:
+            - paragraph [ref=e120]: Drawdown
+          - tab "Momentum" [ref=e121] [cursor=pointer]:
+            - paragraph [ref=e123]: Momentum
+          - tab "Volume" [ref=e124] [cursor=pointer]:
+            - paragraph [ref=e126]: Volume
+          - tab "Events" [ref=e127] [cursor=pointer]:
+            - paragraph [ref=e129]: Events
+          - tab "Watchlist" [ref=e130] [cursor=pointer]:
+            - paragraph [ref=e132]: Watchlist
+        - tabpanel "Drawdown" [ref=e475]:
+          - generic [ref=e476]:
+            - heading "View 3 · Drawdown Scanner" [level=3] [ref=e481]:
+              - text: View 3 · Drawdown Scanner
+              - generic [ref=e482]:
+                - link "Link to heading":
+                  - /url: "#view-3-drawdown-scanner"
+                  - img
+            - group [ref=e485]:
+              - 'generic "keyboard_arrow_right ℹ️ About: View 3 — Drawdown Scanner" [ref=e486] [cursor=pointer]':
+                - generic [ref=e487]:
+                  - generic [ref=e489]: keyboard_arrow_right
+                  - paragraph [ref=e492]: "ℹ️ About: View 3 — Drawdown Scanner"
+            - generic [ref=e494]:
+              - generic [ref=e499]:
+                - generic [ref=e500]:
+                  - paragraph [ref=e503]: Min drawdown from 52W high (%)
+                  - button "Help for Min drawdown from 52W high (%)" [ref=e507] [cursor=pointer]:
+                    - img [ref=e508]
+                - generic [ref=e511]:
+                  - slider "Min drawdown from 52W high (%)" [ref=e515]:
+                    - generic:
+                      - generic:
+                        - paragraph: "-20"
+                  - generic:
+                    - generic:
+                      - paragraph: "-50"
+                    - generic:
+                      - paragraph: "-10"
+              - generic [ref=e520]:
+                - paragraph [ref=e524]: Sectors
+                - generic [ref=e527]:
+                  - generic [ref=e528]:
+                    - button "N/A, close by backspace":
+                      - generic "N/A" [ref=e529]
+                      - img [ref=e531] [cursor=pointer]
+                    - button "Unknown, close by backspace":
+                      - generic "Unknown" [ref=e533]
+                      - img [ref=e535] [cursor=pointer]
+                    - combobox "Selected N/A, Unknown. Sectors" [ref=e538]
+                  - generic [ref=e539]:
+                    - button "Clear all" [ref=e540] [cursor=pointer]
+                    - img "open" [ref=e542] [cursor=pointer]
+              - generic [ref=e545]:
+                - generic [ref=e548]:
+                  - generic [ref=e549]:
+                    - paragraph [ref=e551]: Names ≤ threshold
+                    - button "Help for Names ≤ threshold" [ref=e555] [cursor=pointer]:
+                      - img [ref=e556]
+                  - paragraph [ref=e561]: "0"
+                - generic [ref=e564]:
+                  - generic [ref=e565]:
+                    - paragraph [ref=e567]: Avg drawdown (all filtered)
+                    - button "Help for Avg drawdown (all filtered)" [ref=e571] [cursor=pointer]:
+                      - img [ref=e572]
+                  - paragraph [ref=e577]: +0.00%
+            - alert [ref=e580]:
+              - paragraph [ref=e585]: No stocks meet the drawdown threshold for the selected filters.
+  - img [ref=e473]

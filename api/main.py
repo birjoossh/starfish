@@ -166,10 +166,10 @@ def get_market_overview(calc_date: Optional[str] = Query(None)):
     # Defaults to max date if not specified
     date_filter = "s.calc_date = :calc_date" if calc_date else "s.calc_date = (SELECT MAX(calc_date) FROM mart_stock_signals)"
     
-    # 1. Sector Breadth Aggregates
+    # 1. Sector Breadth Aggregates — restrict to current Nifty 50 constituents
     df = read_sql_df(f"""
-        SELECT 
-            d.sector, 
+        SELECT
+            d.sector,
             COUNT(s.symbol) as num_stocks,
             SUM(CASE WHEN s.return_1d > 0 THEN 1 ELSE 0 END) as advancing,
             SUM(CASE WHEN s.return_1d < 0 THEN 1 ELSE 0 END) as declining,
@@ -179,15 +179,17 @@ def get_market_overview(calc_date: Optional[str] = Query(None)):
         FROM mart_stock_signals s
         JOIN dim_stock d ON s.symbol = d.symbol
         WHERE {date_filter}
+          AND d.nifty50_member = TRUE
         GROUP BY d.sector
     """, params={"calc_date": calc_date} if calc_date else {})
-    
+
     # 2. Raw Signal Rows (for treemap rendering directly on client)
     raw = read_sql_df(f"""
         SELECT s.symbol, d.company_name, d.sector, s.return_1d, s.return_1m, s.return_1y, s.iss_score
         FROM mart_stock_signals s
         JOIN dim_stock d ON s.symbol = d.symbol
         WHERE {date_filter}
+          AND d.nifty50_member = TRUE
     """, params={"calc_date": calc_date} if calc_date else {})
     
     return {
@@ -201,15 +203,16 @@ def get_movers(calc_date: Optional[str] = Query(None)):
     """Return top gainers, losers, and full vol array for scatter plots."""
     date_filter = "s.calc_date = :calc_date" if calc_date else "s.calc_date = (SELECT MAX(calc_date) FROM mart_stock_signals)"
     
-    # Extract Movers Logic
+    # Extract Movers Logic — restrict to current Nifty 50 constituents
     df = read_sql_df(f"""
-        SELECT s.symbol, d.company_name, d.sector, p.close, 
-               s.return_1d, s.return_1m, s.vol_ratio_1d, 
+        SELECT s.symbol, d.company_name, d.sector, p.close,
+               s.return_1d, s.return_1m, s.vol_ratio_1d,
                s.signal_category, s.iss_score
         FROM mart_stock_signals s
         JOIN dim_stock d ON s.symbol = d.symbol
         LEFT JOIN fact_eod_price p ON s.symbol = p.symbol AND s.calc_date = p.trade_date
         WHERE {date_filter}
+          AND d.nifty50_member = TRUE
     """, params={"calc_date": calc_date} if calc_date else {})
     
     if df.empty:
