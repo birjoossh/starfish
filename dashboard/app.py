@@ -26,8 +26,10 @@ from __future__ import annotations
 
 import datetime as dt
 
+import pandas as pd
 import streamlit as st
 
+from dashboard.overview import render_morning_digest, render_overview
 from dashboard.primitives import (
     render_brand_header,
     render_footer,
@@ -47,8 +49,8 @@ API_URL = "http://localhost:8000"
 def _get_available_dates() -> list[str]:
     """Return calc_dates that have signal data, newest first.
 
-    Falls back to today's date if the DB is unreachable so the Phase 0 shell
-    still renders.
+    Falls back to today's date if the DB is unreachable so the shell still
+    renders without a backend.
     """
     try:
         from config.database import read_sql_df
@@ -64,6 +66,32 @@ def _get_available_dates() -> list[str]:
     return [dt.date.today().isoformat()]
 
 
+@st.cache_data(ttl=60)
+def _load_signals(calc_date: str) -> pd.DataFrame:
+    """Load the full mart_stock_signals slice for the calc date.
+
+    Centralized loader so every section that consumes signals (§01–§07) sees
+    the same frame. Returns empty DataFrame on failure.
+    """
+    try:
+        from dashboard.phase_f import load_signals_for_phase_f
+
+        return load_signals_for_phase_f(calc_date)
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=60)
+def _load_watchlist() -> list[str]:
+    """Load pinned watchlist symbols. Returns empty list on failure."""
+    try:
+        from dashboard.watchlist import load_watchlist
+
+        return sorted(load_watchlist())
+    except Exception:
+        return []
+
+
 # ----------------------------- Section stubs ----------------------------- #
 #
 # Each ``_render_section_NN`` function is the single entry point for that
@@ -71,9 +99,13 @@ def _get_available_dates() -> list[str]:
 # body. Keep signatures stable.
 
 
-def _render_section_01_market_overview(calc_date: str) -> None:
+def _render_section_01_market_overview(
+    calc_date: str,
+    signals_df: pd.DataFrame,
+    watchlist: list[str],
+) -> None:
     render_section_header("01", "Market Overview", hint="always open")
-    _placeholder("§01 Market Overview — Phase 1 will land here.")
+    render_overview(calc_date, signals_df, watchlist)
 
 
 def _render_section_02_watchlist(calc_date: str) -> None:
@@ -130,8 +162,8 @@ def _placeholder(message: str) -> None:
 # ------------------------------ Header strip ----------------------------- #
 
 
-def _render_date_picker(dates: list[str]) -> str:
-    """Render the calc-date selector and return the chosen date string."""
+def _render_date_picker(dates: list[str], signals_df: pd.DataFrame) -> str:
+    """Render the calc-date selector + Morning Digest. Returns selected date."""
     col_date, col_digest = st.columns([2, 7])
     with col_date:
         st.markdown(
@@ -146,16 +178,7 @@ def _render_date_picker(dates: list[str]) -> str:
             key="calc_date",
         )
     with col_digest:
-        st.markdown(
-            '<div class="kicker" style="margin-bottom:4px">☀ Morning Digest — top ISS picks land here in Phase 1</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div class="panel" style="padding:8px 12px;color:var(--tx3);font-family:'
-            "'JetBrains Mono',monospace;font-size:11px"
-            '">— phase 1 placeholder —</div>',
-            unsafe_allow_html=True,
-        )
+        render_morning_digest(signals_df)
     return str(selected)
 
 
@@ -191,10 +214,21 @@ def main() -> None:
 
     render_brand_header()
 
-    selected_date = _render_date_picker(dates)
+    # Pre-load signals once at the date pick so every section sees the same
+    # frame. selectbox writes to st.session_state.calc_date; we read it back
+    # from the function return so the very first render uses dates[0].
+    initial_date = dates[0] if dates else dt.date.today().isoformat()
+    signals_df = _load_signals(initial_date)
+    watchlist = _load_watchlist()
+
+    selected_date = _render_date_picker(dates, signals_df)
+
+    # If the user changed the date, re-load signals for the new date.
+    if selected_date != initial_date:
+        signals_df = _load_signals(selected_date)
 
     # ----- Hero sections (always rendered) -----
-    _render_section_01_market_overview(selected_date)
+    _render_section_01_market_overview(selected_date, signals_df, watchlist)
     _render_section_02_watchlist(selected_date)
     _render_section_03_trend(selected_date)
 
