@@ -36,9 +36,19 @@ from dashboard.primitives import (
     render_section_header,
     render_topbar,
 )
+from dashboard.section_movers import render_movers_section
 from dashboard.section_trend import render_trend_section
 from dashboard.section_watchlist import render_watchlist_section
 from dashboard.tokens import inject_global_styles
+
+# Legacy renderers (pre-consolidation) — wrapped in §05–§08 below until each
+# gets a dedicated section_*.py module (Phase 9 polish).
+from dashboard.phase_f import (  # noqa: E402
+    render_drawdown_tab,
+    render_momentum_tab,
+    render_volume_tab,
+)
+from dashboard.phase_g import render_events_tracker  # noqa: E402
 
 
 API_URL = "http://localhost:8000"
@@ -131,29 +141,55 @@ def _render_section_03_trend(
     render_trend_section(calc_date, signals_df)
 
 
-def _render_section_04_movers(calc_date: str) -> None:
+def _render_section_04_movers(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("04", "Movers & Extremes")
-    _placeholder("§04 Movers & Extremes — Phase 4 will land here.")
+    render_movers_section(calc_date, signals_df)
 
 
-def _render_section_05_drawdown(calc_date: str) -> None:
+def _render_section_05_drawdown(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("05", "Drawdown Scanner")
-    _placeholder("§05 Drawdown Scanner — Phase 5 will land here.")
+    if signals_df.empty:
+        _placeholder("No signal data for selected date.")
+    else:
+        render_drawdown_tab(signals_df)
 
 
-def _render_section_06_momentum(calc_date: str) -> None:
+def _render_section_06_momentum(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("06", "Breakout & Momentum Monitor")
-    _placeholder("§06 Breakout & Momentum — Phase 6 will land here.")
+    if signals_df.empty:
+        _placeholder("No signal data for selected date.")
+    else:
+        render_momentum_tab(signals_df)
 
 
-def _render_section_07_volume(calc_date: str) -> None:
+def _render_section_07_volume(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("07", "Volume Anomaly Monitor")
-    _placeholder("§07 Volume Anomaly — Phase 7 will land here.")
+    if signals_df.empty:
+        _placeholder("No signal data for selected date.")
+    else:
+        render_volume_tab(signals_df, calc_date)
 
 
 def _render_section_08_events(calc_date: str) -> None:
-    render_section_header("08", "Corporate Events Tracker")
-    _placeholder("§08 Corporate Events — Phase 8 will land here.")
+    render_section_header(
+        "08", "Corporate Events Tracker",
+        hint="data: fact_corporate_event · TODO-119/120",
+    )
+    try:
+        render_events_tracker()
+    except Exception as e:
+        _placeholder(
+            f"§08 Events Tracker unavailable: {type(e).__name__}. "
+            "Likely blocked on TODO-119/120 (events table not yet seeded)."
+        )
 
 
 def _placeholder(message: str) -> None:
@@ -242,15 +278,17 @@ def main() -> None:
     _render_section_03_trend(selected_date, signals_df)
 
     # ----- Collapsible scanner sections -----
-    for header, hint, fn in [
-        ("04 · Movers & Extremes", "10 G · 10 L", _render_section_04_movers),
-        ("05 · Drawdown Scanner", "≥ 20%", _render_section_05_drawdown),
-        ("06 · Breakout & Momentum Monitor", "3M > 20%", _render_section_06_momentum),
-        ("07 · Volume Anomaly Monitor", "3 tiers", _render_section_07_volume),
-        ("08 · Corporate Events Tracker", "last 7d · next 7d", _render_section_08_events),
-    ]:
-        with st.expander(f"§ {header}   ·   {hint}", expanded=True):
-            fn(selected_date)
+    # Collapsible scanner sections — all expanded by default.
+    with st.expander("§ 04 · Movers & Extremes   ·   10 G · 10 L", expanded=True):
+        _render_section_04_movers(selected_date, signals_df)
+    with st.expander("§ 05 · Drawdown Scanner   ·   ≥ 20%", expanded=True):
+        _render_section_05_drawdown(selected_date, signals_df)
+    with st.expander("§ 06 · Breakout & Momentum Monitor   ·   3M > 20%", expanded=True):
+        _render_section_06_momentum(selected_date, signals_df)
+    with st.expander("§ 07 · Volume Anomaly Monitor   ·   3 tiers", expanded=True):
+        _render_section_07_volume(selected_date, signals_df)
+    with st.expander("§ 08 · Corporate Events Tracker   ·   last 7d · next 7d", expanded=True):
+        _render_section_08_events(selected_date)
 
     render_footer()
 

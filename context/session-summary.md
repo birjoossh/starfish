@@ -1,7 +1,7 @@
 # Session Summary — Dashboard Consolidation (single-page rewrite)
 
 **Active branch:** `feature/dashboard-consolidation` (pushed to `origin` 2026-05-11; do not force-push).
-**Status as of 2026-05-11:** Phases 0, 1, 2, 3 of 10 complete. Phases 4–8 (§04–§08 refactor + drill-in wiring) are next.
+**Status as of 2026-05-11:** Phases 0, 1, 2, 3, 4–8 of 10 complete. Phase 9 (cross-cutting polish) is the only remaining phase.
 **Visual contract:** `design/mock_consolidated.html` (locked).
 **Implementation plan:** `docs/dashboard_consolidation_plan.md` (locked).
 
@@ -13,7 +13,7 @@
 2. Read `~/.claude/projects/-Users-birjoossh-brij-work-starfish/memory/dashboard_consolidation_progress.md` for current phase status table.
 3. Read `docs/dashboard_consolidation_plan.md` §6 (Phase 2 task breakdown).
 4. Confirm on the right branch: `git status` should show `feature/dashboard-consolidation`.
-5. Start Task #17 (Phases 4–8 · Refactor §04–§08 to new tokens + drill-in wiring).
+5. Start Task #18 (Phase 9 · Cross-cutting polish — date scrubber, keybindings, deprecation migration, §05–§07 retokenize + drill-in).
 
 After each phase: `python -m py_compile dashboard/*.py` → `python3 .claude/skills/python-linter/scripts/python_linter.py dashboard/` → `AppTest.from_file('dashboard/app.py').run()` check for exceptions → review pass → update this file → update memory `dashboard_consolidation_progress.md` → commit.
 
@@ -80,8 +80,8 @@ python -c "from streamlit.testing.v1 import AppTest; at = AppTest.from_file('das
 | 1 · §01 Market Overview | DONE 2026-05-11, commit `cd294a7` | KPI cards #1/#2/#4 stubbed pending TODO-106 |
 | 2 · §02 Watchlist + ISS Gauge | DONE 2026-05-11 | `section_watchlist.py` + inline-SVG mini-gauge + CSV export. Factor breakdown stubbed pending TODO-122. |
 | 3 · §03 Trend Workbench (NEW) | DONE 2026-05-11 | `services/trend_stats.py` (27 unit tests passing) + `api/routers/trend.py` + `dashboard/section_trend.py` (filter row · Plotly subplot · calendar heatmap · stats sidebar · sector strip). |
-| **4–8 · §04–§08 refactor** | **NEXT** | reuse phase_f/phase_g; restyle to tokens; wire drill-in to §03 via `st.session_state.trend_subject` |
-| 9 · Polish | pending | scrubber, keybindings, `use_container_width` migration, responsive, smoke test |
+| 4–8 · §04–§08 refactor | DONE 2026-05-11 | §04 fully restyled in `section_movers.py` (filter bar · gainers/losers · scatter · row-click drill into §03). §05–§08 ship working content via thin wrappers around legacy `phase_f` / `phase_g` renderers; full retokenize + drill-in deferred to Phase 9. |
+| **9 · Polish** | **NEXT** | date scrubber, keybindings, `use_container_width` migration, §05–§07 retokenize, row-click drill-in for §05–§07, responsive, smoke test |
 
 ---
 
