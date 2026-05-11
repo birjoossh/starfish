@@ -83,9 +83,44 @@ python -c "from streamlit.testing.v1 import AppTest; at = AppTest.from_file('das
 | 4–8 · §04–§08 refactor | DONE 2026-05-11 | §04 fully restyled in `section_movers.py` (filter bar · gainers/losers · scatter · row-click drill into §03). §05–§08 ship working content via thin wrappers around legacy `phase_f` / `phase_g` renderers; full retokenize + drill-in deferred to Phase 9. |
 | **9 · Polish** | **NEXT** | date scrubber, keybindings, `use_container_width` migration, §05–§07 retokenize, row-click drill-in for §05–§07, responsive, smoke test |
 
+**Commits on `feature/dashboard-consolidation` (pushed to origin):**
+
+| SHA | Phase |
+|---|---|
+| `4b623f8` | Design lock + plan |
+| `376dea1` | Phase 0 — tokens + primitives + shell |
+| `cd294a7` | Phase 1 — §01 Market Overview |
+| `b854401` | Pickup notes (mid-session) |
+| `1bdba90` | Phase 2 — §02 Watchlist |
+| `b18ef69` | Phase 3 — §03 Trend Workbench (NEW) |
+| `eac8bb6` | UI improvements (user) + .gitignore (.playwright-mcp/) |
+| `2c61eee` | Phases 4–8 — §04 retoken + §05–§08 wired |
+
+---
+
+## Phase 9 — what to build next (per plan §13)
+
+| Task | Spec |
+|---|---|
+| 9.1 | Date range scrubber in the top bar — slider through last 250 trading days driving `st.session_state.calc_date` |
+| 9.2 | "Compare to" delta selector (Δ vs 1D / 1W / 1M) — adds Δ columns to relevant tables |
+| 9.3 | Real Alt+A / Alt+C accordion shortcuts — header button row (NOT iframe JS; that anti-pattern was caught and removed in Phase 0). Two `st.button` calls that flip a single `st.session_state.expand_all` flag, then construct each `st.expander` with `expanded=` reading that flag. |
+| 9.4 | `use_container_width=True` → `width='stretch'` migration — Streamlit 1.56 deprecation; warnings present in every AppTest run. Apply project-wide: `dashboard/app.py`, all `dashboard/section_*.py`, `dashboard/phase_*.py`. |
+| 9.5 | Retokenize §05 — replace `phase_f.render_drawdown_tab` wrapper with `dashboard/section_drawdown.py` using primitives + `scanner.render_scanner_drilldown` + row-click drill-in. |
+| 9.6 | Retokenize §06 — replace `phase_f.render_momentum_tab` wrapper with `dashboard/section_momentum.py`. Add Top-15 horizontal bar chart, 4-tier quality tag pills. |
+| 9.7 | Retokenize §07 — replace `phase_f.render_volume_tab` wrapper with `dashboard/section_volume.py`. Add 3 spike sub-tables (1.2× / 1.5× / 2×), contraction table, 50-cell ratio heatmap. |
+| 9.8 | §08 retokenize — only after TODO-119/120 (corporate events ingestion) lands. Until then, the try/except wrapper stays. |
+| 9.9 | Drill-in extension — rows in §05/§06/§07 should set `st.session_state.trend_subject + trend_kind='stock'` like §04 does (see `dashboard/section_movers.py` for the canonical pattern). |
+| 9.10 | Responsive breakpoints — collapse 9-3 grids to stacked at ≤1024px width via injected media query in `tokens.py`. |
+| 9.11 | Loading skeletons for slow queries (mostly the Trend Workbench `/trend` call) — `st.spinner` wrappers or skeleton boxes. |
+| 9.12 | Integration smoke test — new file `integration/scenario_consolidated_dashboard.py`: boot Streamlit headless, verify all 8 section headers present in DOM, AppTest run no exceptions across empty + populated data states. |
+
 ---
 
 ## Phase 3 — what to build next (per plan §7)
+
+_NOTE: kept for historical reference. Phase 3 was completed in commit `b18ef69`._
+
 
 ### Backend tasks
 
