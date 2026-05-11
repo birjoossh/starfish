@@ -1,7 +1,7 @@
 # Session Summary — Dashboard Consolidation (single-page rewrite)
 
-**Active branch:** `feature/dashboard-consolidation` (NOT pushed; do not push without user permission).
-**Status as of 2026-05-11:** Phase 0 + Phase 1 of 10 complete. Phase 2 (Watchlist + ISS Gauge) is next.
+**Active branch:** `feature/dashboard-consolidation` (pushed to `origin` 2026-05-11; do not force-push).
+**Status as of 2026-05-11:** Phases 0, 1, 2 of 10 complete. Phase 3 (Trend Workbench — biggest piece) is next.
 **Visual contract:** `design/mock_consolidated.html` (locked).
 **Implementation plan:** `docs/dashboard_consolidation_plan.md` (locked).
 
@@ -13,7 +13,7 @@
 2. Read `~/.claude/projects/-Users-birjoossh-brij-work-starfish/memory/dashboard_consolidation_progress.md` for current phase status table.
 3. Read `docs/dashboard_consolidation_plan.md` §6 (Phase 2 task breakdown).
 4. Confirm on the right branch: `git status` should show `feature/dashboard-consolidation`.
-5. Start Task #14 (Phase 2 · §02 Watchlist + sticky ISS Gauge sidebar).
+5. Start Task #15 (Phase 3 · §03 Trend Workbench — backend endpoint + period stats).
 
 After each phase: `python -m py_compile dashboard/*.py` → `python3 .claude/skills/python-linter/scripts/python_linter.py dashboard/` → `AppTest.from_file('dashboard/app.py').run()` check for exceptions → review pass → update this file → update memory `dashboard_consolidation_progress.md` → commit.
 
@@ -78,32 +78,43 @@ python -c "from streamlit.testing.v1 import AppTest; at = AppTest.from_file('das
 |---|---|---|
 | 0 · Tokens + primitives + shell | DONE 2026-05-11, commit `376dea1` | |
 | 1 · §01 Market Overview | DONE 2026-05-11, commit `cd294a7` | KPI cards #1/#2/#4 stubbed pending TODO-106 |
-| **2 · §02 Watchlist + ISS Gauge** | **NEXT** | plan §6 |
-| 3 · §03 Trend Workbench (NEW) | pending | biggest piece; new `/trend` endpoint + `services/trend_stats.py` + Plotly subplot |
+| 2 · §02 Watchlist + ISS Gauge | DONE 2026-05-11 | `section_watchlist.py` + inline-SVG mini-gauge + CSV export. Factor breakdown stubbed pending TODO-122. |
+| **3 · §03 Trend Workbench (NEW)** | **NEXT** | biggest piece; new `/trend` endpoint + `services/trend_stats.py` + Plotly subplot |
 | 4–8 · §04–§08 refactor | pending | reuse phase_f/phase_g; restyle to tokens; wire drill-in to §03 |
 | 9 · Polish | pending | scrubber, keybindings, `use_container_width` migration, responsive, smoke test |
 
 ---
 
-## Phase 2 — what to build next (per plan §6)
+## Phase 3 — what to build next (per plan §7)
+
+### Backend tasks
 
 | Task | Spec |
 |---|---|
-| 2.1 | 4 category tabs: Contrarian / Momentum / Event-Driven / Volume-Confirmed |
-| 2.2 | Watchlist table — columns: pin, symbol, company·sector, mcap, ISS bar (use `dashboard.primitives.iss_bar`), primary signal pill (`pill(label, kind)`), key reason text, last event, days on list |
-| 2.3 | Sticky ISS Gauge sidebar (right 3/12) — Plotly Indicator gauge + 5 horizontal `factor_bar()` calls (Price Mom, Vol Quality, Drawdown/Recovery, Corp Event, Rel Strength). Sticky via CSS class `.sticky-sidebar` already in tokens.py. |
-| 2.4 | CSV export button → `nifty50_watchlist_YYYYMMDD.csv` (FastAPI `/watchlist/export` already exists per `api/routers/watchlist.py:570`) |
-| 2.5 | Pin persistence — YAML for now (existing `dashboard/watchlist.py`); SQLite migration is stretch |
+| 3.1 | New endpoint `GET /trend?subject=&kind=stock|sector&period=` in `api/main.py` (or `api/routers/trend.py`). Returns `{ price_series, volume_series, sma_50, sma_200, rs_vs_nifty_series, iss_series, events, period_stats }`. Reads `fact_eod_price` + `mart_stock_signals` + `fact_corporate_event` (when populated). |
+| 3.2 | New `services/trend_stats.py`: pure-pandas compute of period return, vs-Nifty α, max DD, realized vol (annualized), Sharpe (rf=6%), avg daily vol, avg delivery%, vol expansion days, RS rank vs Nifty 50, % days > SMA50. Unit tests for empty series / single row / threshold edges. |
+| 3.3 | Sector aggregation: when `kind=sector`, equal-weight constituent series using `dim_nifty50_constituent` point-in-time membership. |
 
-**Backend gap to note in UI:** ISS scoring function not yet computed (TODOS Phase 2 deviation #3) → factor bars show "—" with a `pill("ISS pipeline pending", "warn")` until TODO-122 + ISS function land.
+### Frontend tasks
 
-**Existing helpers to reuse:**
-- `dashboard.watchlist.load_watchlist()` → `set[str]` of pinned symbols
-- FastAPI `/watchlist/categories/<category>` (api/routers/watchlist.py:452) returns pre-built per-tab lists
-- FastAPI `/watchlist/export` (api/routers/watchlist.py:570) emits the CSV stream
-- Existing `dashboard/phase_g.py::render_watchlist_builder` has the old (pre-consolidation) implementation to mine for query patterns
+| Task | Spec |
+|---|---|
+| 3.4 | Filter row (mode/subject chips/period/overlay toggles). State in `st.session_state.trend.*`. |
+| 3.5 | Subject header: symbol · company · sector · ISIN · current price + 1D % + period return + 52W bracket + ISS now/avg. |
+| 3.6 | Price chart panel — Plotly `make_subplots` 2/3-1/3: price line + area gradient + Nifty RS dashed + SMA50/200 dotted. `add_vline` per event with annotation. `hovermode='x unified'`. |
+| 3.7 | Volume sub-chart — `go.Bar` synced x-axis · color by day return · 20D MA line in saffron. |
+| 3.8 | Calendar heatmap — `go.Heatmap` 5 rows (Mon–Fri) × ~52 cols. Custom 7-bucket diverging colorscale. Hover: date · weekday · return %. |
+| 3.9 | Stats sidebar — 12-row table from period_stats + inline ISS sparkline. Sticky via `.sticky-sidebar` class already in tokens.py. |
+| 3.10 | Events ledger — top-5 by significance in window. |
+| 3.11 | Sector trend strip — 13 mini-tiles · 1M sparkline + return per sector. Click tile → flips Workbench to Sector mode. |
+| 3.12 | Drill-in wiring: row click in §02/§04–§08 sets `st.session_state.trend_subject` and rerenders §03. |
 
-**File to create:** `dashboard/section_watchlist.py` (avoid clashing with existing `dashboard/watchlist.py` which is the YAML loader). Module should export `render_watchlist_section(calc_date, signals_df)` and slot into `dashboard/app.py::_render_section_02_watchlist`.
+**Backend gaps to handle gracefully:**
+- `iss_score` constant 0.0 → ISS series falls back to a flat line with "ISS pipeline pending" pill (consistent with §02).
+- `rs_vs_nifty_*` = 0.0 (TODOS deviation #2) → hide RS overlay + show pill "RS unavailable — index prices pending TODO-106".
+- `fact_corporate_event` table empty (TODO-119/120) → no event markers + "no events in window" annotation.
+
+**File to create:** `dashboard/section_trend.py` exporting `render_trend_section(calc_date, signals_df)`. Plus `api/routers/trend.py` for the new endpoint and `services/trend_stats.py` for stats logic.
 
 ---
 

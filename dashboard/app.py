@@ -36,6 +36,7 @@ from dashboard.primitives import (
     render_section_header,
     render_topbar,
 )
+from dashboard.section_watchlist import render_watchlist_section
 from dashboard.tokens import inject_global_styles
 
 
@@ -108,9 +109,14 @@ def _render_section_01_market_overview(
     render_overview(calc_date, signals_df, watchlist)
 
 
-def _render_section_02_watchlist(calc_date: str) -> None:
-    render_section_header("02", "Watchlist · Auto-curated + Pinned", hint="always open")
-    _placeholder("§02 Watchlist — Phase 2 will land here.")
+def _render_section_02_watchlist(
+    calc_date: str,
+    signals_df: pd.DataFrame,
+) -> None:
+    render_section_header(
+        "02", "Watchlist · Auto-curated + Pinned", hint="always open"
+    )
+    render_watchlist_section(calc_date, signals_df)
 
 
 def _render_section_03_trend(calc_date: str) -> None:
@@ -229,7 +235,7 @@ def main() -> None:
 
     # ----- Hero sections (always rendered) -----
     _render_section_01_market_overview(selected_date, signals_df, watchlist)
-    _render_section_02_watchlist(selected_date)
+    _render_section_02_watchlist(selected_date, signals_df)
     _render_section_03_trend(selected_date)
 
     # ----- Collapsible scanner sections -----
