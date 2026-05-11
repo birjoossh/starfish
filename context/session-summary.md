@@ -1,7 +1,7 @@
 # Session Summary — Dashboard Consolidation (single-page rewrite)
 
 **Active branch:** `feature/dashboard-consolidation` (pushed to `origin` 2026-05-11; do not force-push).
-**Status as of 2026-05-11:** Phases 0, 1, 2 of 10 complete. Phase 3 (Trend Workbench — biggest piece) is next.
+**Status as of 2026-05-11:** Phases 0, 1, 2, 3 of 10 complete. Phases 4–8 (§04–§08 refactor + drill-in wiring) are next.
 **Visual contract:** `design/mock_consolidated.html` (locked).
 **Implementation plan:** `docs/dashboard_consolidation_plan.md` (locked).
 
@@ -13,7 +13,7 @@
 2. Read `~/.claude/projects/-Users-birjoossh-brij-work-starfish/memory/dashboard_consolidation_progress.md` for current phase status table.
 3. Read `docs/dashboard_consolidation_plan.md` §6 (Phase 2 task breakdown).
 4. Confirm on the right branch: `git status` should show `feature/dashboard-consolidation`.
-5. Start Task #15 (Phase 3 · §03 Trend Workbench — backend endpoint + period stats).
+5. Start Task #17 (Phases 4–8 · Refactor §04–§08 to new tokens + drill-in wiring).
 
 After each phase: `python -m py_compile dashboard/*.py` → `python3 .claude/skills/python-linter/scripts/python_linter.py dashboard/` → `AppTest.from_file('dashboard/app.py').run()` check for exceptions → review pass → update this file → update memory `dashboard_consolidation_progress.md` → commit.
 
@@ -79,8 +79,8 @@ python -c "from streamlit.testing.v1 import AppTest; at = AppTest.from_file('das
 | 0 · Tokens + primitives + shell | DONE 2026-05-11, commit `376dea1` | |
 | 1 · §01 Market Overview | DONE 2026-05-11, commit `cd294a7` | KPI cards #1/#2/#4 stubbed pending TODO-106 |
 | 2 · §02 Watchlist + ISS Gauge | DONE 2026-05-11 | `section_watchlist.py` + inline-SVG mini-gauge + CSV export. Factor breakdown stubbed pending TODO-122. |
-| **3 · §03 Trend Workbench (NEW)** | **NEXT** | biggest piece; new `/trend` endpoint + `services/trend_stats.py` + Plotly subplot |
-| 4–8 · §04–§08 refactor | pending | reuse phase_f/phase_g; restyle to tokens; wire drill-in to §03 |
+| 3 · §03 Trend Workbench (NEW) | DONE 2026-05-11 | `services/trend_stats.py` (27 unit tests passing) + `api/routers/trend.py` + `dashboard/section_trend.py` (filter row · Plotly subplot · calendar heatmap · stats sidebar · sector strip). |
+| **4–8 · §04–§08 refactor** | **NEXT** | reuse phase_f/phase_g; restyle to tokens; wire drill-in to §03 via `st.session_state.trend_subject` |
 | 9 · Polish | pending | scrubber, keybindings, `use_container_width` migration, responsive, smoke test |
 
 ---

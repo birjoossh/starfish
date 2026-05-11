@@ -36,6 +36,7 @@ from dashboard.primitives import (
     render_section_header,
     render_topbar,
 )
+from dashboard.section_trend import render_trend_section
 from dashboard.section_watchlist import render_watchlist_section
 from dashboard.tokens import inject_global_styles
 
@@ -119,13 +120,15 @@ def _render_section_02_watchlist(
     render_watchlist_section(calc_date, signals_df)
 
 
-def _render_section_03_trend(calc_date: str) -> None:
+def _render_section_03_trend(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header(
         "03",
         "Trend Workbench · Multi-Day Analysis",
         hint="always open · price · volume · ISS over time",
     )
-    _placeholder("§03 Trend Workbench — Phase 3 will land here (NEW).")
+    render_trend_section(calc_date, signals_df)
 
 
 def _render_section_04_movers(calc_date: str) -> None:
@@ -236,7 +239,7 @@ def main() -> None:
     # ----- Hero sections (always rendered) -----
     _render_section_01_market_overview(selected_date, signals_df, watchlist)
     _render_section_02_watchlist(selected_date, signals_df)
-    _render_section_03_trend(selected_date)
+    _render_section_03_trend(selected_date, signals_df)
 
     # ----- Collapsible scanner sections -----
     for header, hint, fn in [
