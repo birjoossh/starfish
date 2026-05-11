@@ -1,376 +1,249 @@
-"""Nifty 50 Dashboard — Terminal-Inspired Single Page Layout.
+"""Nifty 50 Terminal — consolidated single-page dashboard.
 
-Dense, info-centric UI adhering strictly to DESIGN.md.
+Design lock: 2026-05-11. Visual source of truth: ``design/mock_consolidated.html``.
+Implementation plan: ``docs/dashboard_consolidation_plan.md``.
+
+Layout (top → bottom):
+
+    Sticky status bar
+    Brand header + tricolor thread
+    Date selector + Morning Digest
+    ─────────────────────────────
+    §01 Market Overview      [always open]
+    §02 Watchlist            [always open]
+    §03 Trend Workbench      [always open]   NEW
+    §04 Movers & Extremes    [collapsible]
+    §05 Drawdown Scanner     [collapsible]
+    §06 Breakout/Momentum    [collapsible]
+    §07 Volume Anomaly       [collapsible]
+    §08 Corporate Events     [collapsible]
+    ─────────────────────────────
+    Footer
+
+Phase 0 ships the empty shell; per-section content lands in Phases 1–8.
 """
 from __future__ import annotations
 
-import streamlit as st
-import pandas as pd
-import requests
-import plotly.express as px
+import datetime as dt
 
-from config.database import read_sql_df
-from dashboard.phase_f import (
-    load_signals_for_phase_f,
-    render_drawdown_tab,
-    render_momentum_tab,
-    render_volume_tab,
+import pandas as pd
+import streamlit as st
+
+from dashboard.overview import render_morning_digest, render_overview
+from dashboard.primitives import (
+    render_brand_header,
+    render_footer,
+    render_section_header,
+    render_topbar,
 )
-from dashboard.phase_g import (
-    render_events_tracker,
-    render_watchlist_builder,
-)
-from dashboard.watchlist import load_watchlist
-from dashboard.widget_info import render_info, tooltip
+from dashboard.tokens import inject_global_styles
+
 
 API_URL = "http://localhost:8000"
 
-@st.cache_data(ttl=60)
-def get_available_dates() -> list:
-    """Get dates with signal data."""
-    df = read_sql_df("SELECT DISTINCT calc_date FROM mart_stock_signals ORDER BY calc_date DESC")
-    return df["calc_date"].tolist() if not df.empty else []
 
-def get_market_data(selected_date: str):
-    try:
-        resp = requests.get(f"{API_URL}/market-overview?calc_date={selected_date}", timeout=5)
-        return resp.json() if resp.status_code == 200 else {}
-    except Exception:
-         return {}
-         
-def get_movers_data(selected_date: str):
-    try:
-        resp = requests.get(f"{API_URL}/movers?calc_date={selected_date}", timeout=5)
-        return resp.json() if resp.status_code == 200 else {}
-    except Exception:
-         return {}
+# ----------------------------- Data accessors ---------------------------- #
+
 
 @st.cache_data(ttl=60)
-def load_screener_signals(calc_date: str) -> pd.DataFrame:
-    """Full mart slice for Overview + Phase F views (cached)."""
-    return load_signals_for_phase_f(calc_date)
+def _get_available_dates() -> list[str]:
+    """Return calc_dates that have signal data, newest first.
 
-def main():
+    Falls back to today's date if the DB is unreachable so the shell still
+    renders without a backend.
+    """
+    try:
+        from config.database import read_sql_df
+
+        df = read_sql_df(
+            "SELECT DISTINCT calc_date FROM mart_stock_signals "
+            "ORDER BY calc_date DESC"
+        )
+        if not df.empty:
+            return [str(d) for d in df["calc_date"].tolist()]
+    except Exception:
+        pass
+    return [dt.date.today().isoformat()]
+
+
+@st.cache_data(ttl=60)
+def _load_signals(calc_date: str) -> pd.DataFrame:
+    """Load the full mart_stock_signals slice for the calc date.
+
+    Centralized loader so every section that consumes signals (§01–§07) sees
+    the same frame. Returns empty DataFrame on failure.
+    """
+    try:
+        from dashboard.phase_f import load_signals_for_phase_f
+
+        return load_signals_for_phase_f(calc_date)
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=60)
+def _load_watchlist() -> list[str]:
+    """Load pinned watchlist symbols. Returns empty list on failure."""
+    try:
+        from dashboard.watchlist import load_watchlist
+
+        return sorted(load_watchlist())
+    except Exception:
+        return []
+
+
+# ----------------------------- Section stubs ----------------------------- #
+#
+# Each ``_render_section_NN`` function is the single entry point for that
+# section. Phase 0 leaves them as styled placeholders; Phases 1–8 replace the
+# body. Keep signatures stable.
+
+
+def _render_section_01_market_overview(
+    calc_date: str,
+    signals_df: pd.DataFrame,
+    watchlist: list[str],
+) -> None:
+    render_section_header("01", "Market Overview", hint="always open")
+    render_overview(calc_date, signals_df, watchlist)
+
+
+def _render_section_02_watchlist(calc_date: str) -> None:
+    render_section_header("02", "Watchlist · Auto-curated + Pinned", hint="always open")
+    _placeholder("§02 Watchlist — Phase 2 will land here.")
+
+
+def _render_section_03_trend(calc_date: str) -> None:
+    render_section_header(
+        "03",
+        "Trend Workbench · Multi-Day Analysis",
+        hint="always open · price · volume · ISS over time",
+    )
+    _placeholder("§03 Trend Workbench — Phase 3 will land here (NEW).")
+
+
+def _render_section_04_movers(calc_date: str) -> None:
+    render_section_header("04", "Movers & Extremes")
+    _placeholder("§04 Movers & Extremes — Phase 4 will land here.")
+
+
+def _render_section_05_drawdown(calc_date: str) -> None:
+    render_section_header("05", "Drawdown Scanner")
+    _placeholder("§05 Drawdown Scanner — Phase 5 will land here.")
+
+
+def _render_section_06_momentum(calc_date: str) -> None:
+    render_section_header("06", "Breakout & Momentum Monitor")
+    _placeholder("§06 Breakout & Momentum — Phase 6 will land here.")
+
+
+def _render_section_07_volume(calc_date: str) -> None:
+    render_section_header("07", "Volume Anomaly Monitor")
+    _placeholder("§07 Volume Anomaly — Phase 7 will land here.")
+
+
+def _render_section_08_events(calc_date: str) -> None:
+    render_section_header("08", "Corporate Events Tracker")
+    _placeholder("§08 Corporate Events — Phase 8 will land here.")
+
+
+def _placeholder(message: str) -> None:
+    """Render a hairline panel with a muted "coming soon" message."""
+    st.markdown(
+        f"""
+<div class="panel" style="padding:32px 24px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.06em">
+  {message}
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+# ------------------------------ Header strip ----------------------------- #
+
+
+def _render_date_picker(dates: list[str], signals_df: pd.DataFrame) -> str:
+    """Render the calc-date selector + Morning Digest. Returns selected date."""
+    col_date, col_digest = st.columns([2, 7])
+    with col_date:
+        st.markdown(
+            '<div class="kicker" style="margin-bottom:4px">Calc Date</div>',
+            unsafe_allow_html=True,
+        )
+        selected = st.selectbox(
+            "Calc Date",
+            dates,
+            index=0,
+            label_visibility="collapsed",
+            key="calc_date",
+        )
+    with col_digest:
+        render_morning_digest(signals_df)
+    return str(selected)
+
+
+# ----------------------------- Entry point ------------------------------- #
+#
+# Keyboard shortcuts (Alt+A expand-all / Alt+C collapse-all) are deferred to
+# Phase 9 — they cannot be implemented via ``components.v1.html`` because that
+# runs in a sandboxed iframe and cannot mutate parent-document expanders. The
+# correct path is a Streamlit custom component or a header button row.
+
+
+def main() -> None:
+    """Streamlit entry point."""
     st.set_page_config(
-        page_title="Nifty 50 Terminal",
-        page_icon="terminal",
+        page_title="Starfish · Nifty 50 Terminal",
+        page_icon="📈",
         layout="wide",
         initial_sidebar_state="collapsed",
     )
-    
-    st.markdown("""
-        <style>
-            /* Force metric values to wrap dynamically on small screens and decrease font to avoid ellipsis */
-            div[data-testid="stMetricValue"] > div {
-                white-space: normal !important; 
-                word-wrap: break-word !important; 
-                text-overflow: unset !important;
-                overflow: visible !important;
-                font-size: 1.5rem !important;
-            }
-            div[data-testid="stMetricLabel"] > div {
-                white-space: normal !important;
-                overflow: visible !important;
-                font-size: 0.95rem !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    dates = get_available_dates()
-    if not dates:
-        st.error("No signal data fully ingested yet.")
-        return
-        
-    import base64, os
-    def get_base64_of_bin_file(bin_file):
-        with open(bin_file, 'rb') as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
+    inject_global_styles()
 
-    # Render the full SVG logo as a responsive banner (width proportional to screen)
-    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "starfish_logo.svg")
-    if not os.path.exists(logo_path):
-        logo_path = "starfish_logo.svg"
-
-    try:
-        svg_b64 = get_base64_of_bin_file(logo_path)
-        st.markdown(
-            f'<img src="data:image/svg+xml;base64,{svg_b64}" '
-            f'style="width:55%; max-width:600px; min-width:260px; display:block; margin-bottom:4px;">',
-            unsafe_allow_html=True
-        )
-    except:
-        st.markdown("## 📈 Starfish · Nifty 50 Intelligence")
-
-    # --- Date selector + Morning Digest row ---
-    t1, t2 = st.columns([2, 5])
-    with t1:
-        selected_date = st.selectbox("Date", dates, index=0, label_visibility="collapsed")
-    with t2:
-        st.caption("☀️ **Morning Digest** — Top 3 by ISS Score", help=tooltip("morning_digest"))
-        signals_df  = load_screener_signals(str(selected_date))
-        if not signals_df.empty:
-            d_cols = st.columns(3)
-            digest = signals_df.nlargest(3, 'iss_score')
-            for i, (_, row) in enumerate(digest.iterrows()):
-                if i < 3:
-                    hover_text = (
-                        f"1D Ret: {row['return_1d']*100:+.2f}%  |  "
-                        f"Vol: {row['vol_ratio_1d']:.2f}x  |  "
-                        f"Signal: {row['signal_category']}  |  "
-                        f"{row['drawdown_from_52w_high_pct']:+.2f}% from 52W High"
-                    )
-                    d_cols[i].markdown(
-                        f"**{row['symbol']}**<br>"
-                        f"<span style='font-size: 0.85em; color: #4ADE80;'>ISS {row['iss_score']:.2f}</span>"
-                        f"<span style='font-size: 0.85em; color: gray;'>&nbsp;|&nbsp;{row['return_1d']*100:+.2f}%</span>",
-                        unsafe_allow_html=True,
-                        help=hover_text
-                    )
-
-    st.markdown("---")
-
-    tab_overview, tab_dd, tab_mom, tab_vol, tab_events, tab_watchlist = st.tabs(
-        ["Overview", "Drawdown", "Momentum", "Volume", "Events", "Watchlist"]
+    dates = _get_available_dates()
+    today_label = dt.date.today().strftime("%a %d %b %Y").upper()
+    render_topbar(
+        nse_status="CLOSED",
+        nse_live=False,
+        date_label=today_label,
+        last_load=dates[0] if dates else "—",
+        user="rahul@starfish",
+        universe="NIFTY 50",
+        latency_ms=42,
     )
 
-    signals_df = load_screener_signals(str(selected_date))
+    render_brand_header()
 
-    with tab_dd:
-        render_drawdown_tab(signals_df)
-    with tab_mom:
-        render_momentum_tab(signals_df)
-    with tab_vol:
-        render_volume_tab(signals_df, str(selected_date))
-    with tab_events:
-        render_events_tracker()
-    with tab_watchlist:
-        render_watchlist_builder()
+    # Pre-load signals once at the date pick so every section sees the same
+    # frame. selectbox writes to st.session_state.calc_date; we read it back
+    # from the function return so the very first render uses dates[0].
+    initial_date = dates[0] if dates else dt.date.today().isoformat()
+    signals_df = _load_signals(initial_date)
+    watchlist = _load_watchlist()
 
-    with tab_overview:
-        _render_overview(
-            selected_date,
-            signals_df,
-        )
+    selected_date = _render_date_picker(dates, signals_df)
 
+    # If the user changed the date, re-load signals for the new date.
+    if selected_date != initial_date:
+        signals_df = _load_signals(selected_date)
 
-def _render_overview(selected_date, signals_df: pd.DataFrame) -> None:
-    """Views 1–2 plus master screener (existing single-page layout)."""
-    market_data = get_market_data(str(selected_date))
-    movers_data = get_movers_data(str(selected_date))
-    watchlist = load_watchlist()
+    # ----- Hero sections (always rendered) -----
+    _render_section_01_market_overview(selected_date, signals_df, watchlist)
+    _render_section_02_watchlist(selected_date)
+    _render_section_03_trend(selected_date)
 
-    # Data extraction
-    sector_data = pd.DataFrame(market_data.get("sector_breadth", []))
-    components = pd.DataFrame(market_data.get("components", []))
-    gainers_data = pd.DataFrame(movers_data.get("gainers", []))
-    losers_data = pd.DataFrame(movers_data.get("losers", []))
+    # ----- Collapsible scanner sections -----
+    for header, hint, fn in [
+        ("04 · Movers & Extremes", "10 G · 10 L", _render_section_04_movers),
+        ("05 · Drawdown Scanner", "≥ 20%", _render_section_05_drawdown),
+        ("06 · Breakout & Momentum Monitor", "3M > 20%", _render_section_06_momentum),
+        ("07 · Volume Anomaly Monitor", "3 tiers", _render_section_07_volume),
+        ("08 · Corporate Events Tracker", "last 7d · next 7d", _render_section_08_events),
+    ]:
+        with st.expander(f"§ {header}   ·   {hint}", expanded=True):
+            fn(selected_date)
 
-    # Helper function for text filtering
-    def filter_dataframe(df: pd.DataFrame, query: str) -> pd.DataFrame:
-        if not query or df.empty: return df
-        mask = df.astype(str).apply(lambda col: col.str.contains(query, case=False, na=False))
-        return df[mask.any(axis=1)]
-
-    # --- Header: Global Metrics ---
-    if not sector_data.empty and not components.empty:
-        adv_total = sector_data["advancing"].sum()
-        dec_total = sector_data["declining"].sum()
-        avg_1d = components["return_1d"].mean() * 100
-        
-        m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("Overall Breadth", f"{int(adv_total)} Adv", f"{-int(dec_total)} Dec", help=tooltip("overall_breadth"))
-        m2.metric("Average ISS", f"{components['iss_score'].mean():.2f}/100", help=tooltip("average_iss"))
-        m3.metric("Avg 1D Return", f"{avg_1d:+.2f}%", help=tooltip("avg_1d_return"))
-        top_sector = sector_data.loc[sector_data["avg_return_1d"].idxmax()]["sector"] if not sector_data.empty else "N/A"
-        m4.metric("Top Sector", top_sector, help=tooltip("top_sector"))
-        m5.metric("Market Structure", "Mean Reverting", help=tooltip("market_structure"))
-
-    # --- Visualizations Expander (Now immediately below summary) ---
-    with st.expander("📊 Nifty 50 Sector Rotation & Breadth Heatmap", expanded=True):
-        render_info("sector_rotation_heatmap")
-        vc1, vc2 = st.columns([1,2])
-        with vc1:
-            if 'adv_total' in locals():
-                pie_df = pd.DataFrame({
-                    "Status": ["Advancing", "Declining"],
-                    "Count": [adv_total, dec_total]
-                })
-                fig = px.pie(pie_df, values='Count', names='Status', hole=.4, color='Status',
-                             color_discrete_map={"Advancing": "#00ff00", "Declining": "#ff0000"})
-                fig.update_layout(height=400, margin=dict(l=20, r=20, t=30, b=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig, use_container_width=True)
-                
-        with vc2:
-             if not components.empty:
-                 components["return_px"] = components["return_1d"] * 100
-                 fig2 = px.treemap(components, 
-                                   path=[px.Constant("Nifty 50"), 'sector', 'symbol'], 
-                                   values='iss_score',
-                                   color='return_px',
-                                   color_continuous_scale='RdYlGn',
-                                   color_continuous_midpoint=0)
-                 fig2.update_layout(height=400, margin=dict(l=10, r=10, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)")
-                 st.plotly_chart(fig2, use_container_width=True)
-
-    # --- Row 1: Sector Breadth & Watchlist ---
-    st.markdown("---")
-    
-    # Init session states for filters to allow programmatic tracking
-    for k in ["sec_search", "watch_search", "gain_search", "lose_search", "scr_search"]:
-        if k not in st.session_state: st.session_state[k] = ""
-
-    c1, c2 = st.columns(2)
-    
-    with c1:
-        st_c1_hdr, st_c1_flt = st.columns([5, 4])
-        st_c1_hdr.markdown("### Sector Aggregation")
-        st.session_state.sec_search = st_c1_flt.text_input("Filter...", key="ti_sec", value=st.session_state.sec_search, placeholder="Filter sector...", label_visibility="collapsed")
-        render_info("sector_aggregation")
-
-        if not sector_data.empty:
-            sector_data = sector_data.sort_values(by="avg_return_1d", ascending=False)
-            sector_display = sector_data.copy()
-            for ratio_col in ("avg_return_1d", "avg_return_1m"):
-                if ratio_col in sector_display.columns:
-                    sector_display[ratio_col] = sector_display[ratio_col].astype(float) * 100
-            filtered_sector = filter_dataframe(sector_display, st.session_state.sec_search)
-            st.dataframe(
-                filtered_sector,
-                use_container_width=True,
-                height=260, # Lock height
-                column_config={
-                    "sector": st.column_config.TextColumn("Sector", width="medium"),
-                    "avg_return_1d": st.column_config.NumberColumn("Avg 1D %", format="%+.2f%%", help=tooltip("return_1d")),
-                    "avg_return_1m": st.column_config.NumberColumn("Avg 1M %", format="%+.2f%%", help=tooltip("return_1m")),
-                    "avg_iss": st.column_config.NumberColumn("Avg ISS", format="%.2f", help=tooltip("iss_score")),
-                }
-            )
-
-    with c2:
-        st_c2_hdr, st_c2_flt = st.columns([5, 4])
-        st_c2_hdr.markdown("### Watchlist Signals")
-        st.session_state.watch_search = st_c2_flt.text_input("Filter...", key="ti_watch", value=st.session_state.watch_search, placeholder="Filter specific tracker...", label_visibility="collapsed")
-        render_info("watchlist_signals")
-
-        if watchlist and not signals_df.empty:
-            watch_df = signals_df[signals_df["symbol"].isin(watchlist)][[
-                "symbol", "close", "return_1d", "vol_ratio_1d", "iss_score", "signal_category"
-            ]].copy()
-            watch_df["return_1d"] = watch_df["return_1d"].astype(float) * 100
-            watch_df.columns = ["Symbol", "Close", "Ret 1D", "Vol 20D", "ISS", "Signal"]
-            filtered_watch = filter_dataframe(watch_df, st.session_state.watch_search)
-            st.dataframe(
-                filtered_watch,
-                use_container_width=True,
-                height=260,
-                column_config={
-                    "Symbol": st.column_config.TextColumn("Symbol", width="medium"),
-                    "Close": st.column_config.NumberColumn(format="₹%.2f"),
-                    "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                    "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                    "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
-                    "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
-                }
-            )
-        else:
-            st.info("No items in Watchlist")
-
-    # --- Row 2: Volatility Movers ---
-    c3, c4 = st.columns(2)
-    disp_cols = ["symbol", "sector", "return_1d", "vol_ratio_1d", "iss_score"]
-    
-    with c3:
-        st_c3_hdr, st_c3_flt = st.columns([5, 4])
-        st_c3_hdr.markdown("### 🔥 Mover: Gainers")
-        st.session_state.gain_search = st_c3_flt.text_input("Filter...", key="ti_gain", value=st.session_state.gain_search, placeholder="Filter by symbol...", label_visibility="collapsed")
-        render_info("movers_gainers")
-
-        if not gainers_data.empty:
-            g_disp = gainers_data[disp_cols].copy()
-            g_disp["return_1d"] = g_disp["return_1d"].astype(float) * 100
-            g_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol 20D", "ISS"]
-            filtered_gain = filter_dataframe(g_disp, st.session_state.gain_search)
-            st.dataframe(filtered_gain, use_container_width=True, hide_index=True, column_config={
-                "Sector": st.column_config.TextColumn("Sector", width="medium"),
-                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
-            })
-
-    with c4:
-        st_c4_hdr, st_c4_flt = st.columns([5, 4])
-        st_c4_hdr.markdown("### ❄️ Extremes: Losers")
-        st.session_state.lose_search = st_c4_flt.text_input("Filter...", key="ti_lose", value=st.session_state.lose_search, placeholder="Filter by symbol...", label_visibility="collapsed")
-        render_info("movers_losers")
-
-        if not losers_data.empty:
-            l_disp = losers_data[disp_cols].copy()
-            l_disp["return_1d"] = l_disp["return_1d"].astype(float) * 100
-            l_disp.columns = ["Symbol", "Sector", "Ret 1D", "Vol 20D", "ISS"]
-            filtered_lose = filter_dataframe(l_disp, st.session_state.lose_search)
-            st.dataframe(filtered_lose, use_container_width=True, hide_index=True, column_config={
-                "Sector": st.column_config.TextColumn("Sector", width="medium"),
-                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
-            })
-
-    # --- Full Master Screener ---
-    st.markdown("---")
-    st_s_hdr, st_s_flt = st.columns([8, 4])
-    st_s_hdr.markdown("### 📋 Primary Scanner Pipeline Data")
-    st.session_state.scr_search = st_s_flt.text_input("Filter...", key="ti_scr", value=st.session_state.scr_search, placeholder="Filter table via Sector, Regex, or Symbol...", label_visibility="collapsed")
-    render_info("primary_scanner")
-    
-    if not signals_df.empty:
-        display_df = signals_df[[
-            "symbol", "company_name", "sector", "close",
-            "return_1d", "return_1m", "return_3m",
-            "vol_ratio_1d", "avg_volume_20d",
-            "drawdown_from_52w_high_pct", "distance_from_52w_low_pct",
-            "iss_score", "signal_category", "momentum_flag", "accumulation_flag",
-        ]].copy()
-
-        for ratio_col in ("return_1d", "return_1m", "return_3m"):
-            display_df[ratio_col] = display_df[ratio_col].astype(float) * 100
-
-        display_df["momentum_flag"] = display_df["momentum_flag"].apply(lambda x: "MOM" if x else "")
-        display_df["accumulation_flag"] = display_df["accumulation_flag"].apply(lambda x: "ACC" if x else "")
-        display_df["watch"] = display_df["symbol"].apply(lambda s: "★" if s in watchlist else "")
-
-        display_df.columns = [
-            "Symbol", "Company", "Sector", "Close",
-            "Ret 1D", "Ret 1M", "Ret 3M",
-            "Vol 20D", "Avg Vol 20D",
-            "% from 52W High", "% from 52W Low",
-            "ISS", "Signal", "Momentum", "Accum",
-            "Watch",
-        ]
-        
-        filtered_display = filter_dataframe(display_df, st.session_state.scr_search)
-    
-        st.dataframe(
-            filtered_display,
-            use_container_width=True,
-            height=600,
-            column_config={
-                "Sector": st.column_config.TextColumn("Sector", width="medium"),
-                "Company": st.column_config.TextColumn("Company", width="medium"),
-                "Ret 1D": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),
-                "Ret 1M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1m")),
-                "Ret 3M": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_3m")),
-                "Close": st.column_config.NumberColumn(format="₹%.2f"),
-                "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
-                "Avg Vol 20D": st.column_config.NumberColumn(help=tooltip("avg_volume_20d")),
-                "% from 52W High": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("drawdown_pct")),
-                "% from 52W Low": st.column_config.NumberColumn(format="%.2f%%", help=tooltip("distance_from_low")),
-                "ISS": st.column_config.NumberColumn(format="%.2f", help=tooltip("iss_score")),
-                "Signal": st.column_config.TextColumn("Signal", help=tooltip("signal_category")),
-                "Momentum": st.column_config.TextColumn("Momentum", help=tooltip("momentum_flag")),
-                "Accum": st.column_config.TextColumn("Accum", help=tooltip("accumulation_flag")),
-            },
-        )
+    render_footer()
 
 
 if __name__ == "__main__":

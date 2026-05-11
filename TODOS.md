@@ -12,6 +12,20 @@ Everything below must be completed before we move to Phase 2.
 
 ---
 
+## UI Feature Requests
+
+Tracked per project rule (`.claude/CLAUDE.md` → "Maintain a consistent todo list of new feature requests and track its status").
+
+| Date | Request | Status | Notes |
+|---|---|---|---|
+| 2026-05-10 | Configurable Near-breakout radar percent (slider) | **Done** | `dashboard/phase_f.py` — Distance + Min ISS sliders |
+| 2026-05-10 | Same configurability for Active momentum and RS chart | **Done** | Min ISS slider on Active momentum; Top N slider on RS chart |
+| 2026-05-10 | Sector Aggregation row click → stocks in sector with Primary Scanner cols | **Done** | `dashboard/app.py` — `on_select="rerun"` + `_render_scanner_drilldown` |
+| 2026-05-10 | Treemap tile click → stock/sector details with Primary Scanner cols | **Done** | Same drill-down helper, dispatched on plotly_chart selection |
+| 2026-05-11 | Consolidate dashboard to single page · 8 sections · Streamlit | **Planned** | Design locked at `design/mock_consolidated.html`. Implementation plan: `docs/dashboard_consolidation_plan.md` (10 phases, ~14.5 eng-days). Includes new §03 Trend Workbench for multi-day price/volume/ISS analysis per stock or sector. |
+
+---
+
 ## Spec Alignment Audit (2026-04-10)
 
 Full walkthrough against `docs/nifty50_dashboard_full_spec.md` (Sections 1–9, 13).

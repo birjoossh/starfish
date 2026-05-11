@@ -1,0 +1,1879 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Starfish · Nifty 50 Terminal · 2026-05-10</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0A0B; --elev:#131316; --elev2:#1C1C20;
+    --bd:#26262C; --bd2:#3A3A42;
+    --tx:#F4F4F0; --tx2:#8B8B92; --tx3:#57575E;
+    --acc:#F4A340;
+    --pos:#4ADE80; --neg:#F87171; --warn:#FBBF24; --info:#60A5FA; --evt:#A78BFA;
+  }
+  *{-webkit-font-smoothing:antialiased}
+  html,body{background:var(--bg);color:var(--tx);font-family:'Geist',sans-serif;font-size:13px}
+  body{
+    background-image:
+      radial-gradient(1100px circle at 18% -12%, rgba(244,163,64,.05), transparent 55%),
+      radial-gradient(900px circle at 92% 110%, rgba(96,165,250,.035), transparent 55%);
+    min-height:100vh;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:100;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+    opacity:.025;mix-blend-mode:overlay;
+  }
+  .serif{font-family:'Instrument Serif',serif}
+  .mono,.num{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+  .panel{background:var(--elev);border:1px solid var(--bd)}
+  .sub{background:var(--elev2);border:1px solid var(--bd)}
+  .hl{border-color:var(--bd)}
+  .tx2{color:var(--tx2)} .tx3{color:var(--tx3)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .acc{color:var(--acc)}
+  .warn{color:var(--warn)} .info{color:var(--info)} .evt{color:var(--evt)}
+
+  .tricolor{
+    height:1px;
+    background:linear-gradient(90deg, transparent 0%, #FF9933 22%, #FFFFFF 50%, #138808 78%, transparent 100%);
+    opacity:.45;
+  }
+
+  /* Section number — editorial */
+  .sec-num{font-family:'Instrument Serif',serif;font-style:italic;color:var(--acc);font-size:18px;line-height:1}
+  .sec-rule{height:1px;background:var(--bd);flex:1}
+  .kicker{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--tx3)}
+
+  /* Pills */
+  .pill{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border:1px solid currentColor;border-radius:999px;
+        font-family:'JetBrains Mono',monospace;font-size:9.5px;line-height:1.5;text-transform:uppercase;letter-spacing:.06em}
+  .pill.fill-pos{background:rgba(74,222,128,.10)}
+  .pill.fill-neg{background:rgba(248,113,113,.10)}
+  .pill.fill-warn{background:rgba(251,191,36,.10)}
+  .pill.fill-info{background:rgba(96,165,250,.10)}
+  .pill.fill-acc{background:rgba(244,163,64,.10)}
+  .pill.fill-evt{background:rgba(167,139,250,.10)}
+
+  /* Tag — square */
+  .tag{display:inline-block;padding:1px 6px;border:1px solid var(--bd2);border-radius:2px;
+       font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--tx2)}
+
+  /* ISS bar */
+  .iss-bar{display:inline-flex;align-items:center;gap:6px}
+  .iss-track{height:5px;width:64px;background:var(--elev2);border-radius:3px;overflow:hidden;border:1px solid var(--bd)}
+  .iss-fill{height:100%}
+
+  /* tables */
+  table.dense{width:100%;border-collapse:collapse}
+  table.dense th{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);
+    text-align:left;padding:8px 10px;border-bottom:1px solid var(--bd);white-space:nowrap;background:var(--elev)}
+  table.dense td{padding:8px 10px;border-bottom:1px solid var(--bd);font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap}
+  table.dense td.sym{font-family:'Geist',sans-serif;font-weight:500}
+  table.dense tr:hover td{background:var(--elev2)}
+  table.dense tr.head-row td{background:var(--elev2);font-weight:500;color:var(--tx2)}
+  td.r{text-align:right} th.r{text-align:right}
+  td.c{text-align:center} th.c{text-align:center}
+
+  /* Treemap */
+  .tm-wrap{display:flex;flex-direction:column;gap:2px}
+  .tm-row{display:flex;gap:2px}
+  .tm-block{display:flex;flex-direction:column;gap:2px;padding:0;position:relative}
+  .tm-cell{padding:6px 8px;display:flex;flex-direction:column;justify-content:space-between;
+    overflow:hidden;cursor:pointer;transition:outline-color .15s, transform .15s;
+    outline:1px solid transparent;border-radius:2px}
+  .tm-cell:hover{outline-color:var(--acc);transform:translateZ(0)}
+  .tm-cell .sym{font-family:'Geist',sans-serif;font-weight:600;font-size:11px;color:#fff;letter-spacing:.02em}
+  .tm-cell .ret{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500}
+  .tm-block .lbl{position:absolute;top:4px;right:6px;font-family:'JetBrains Mono',monospace;font-size:9px;
+    color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.08em;pointer-events:none;z-index:2}
+
+  /* color scale for treemap */
+  .c-1{background:#5A1A1F;color:#fff} /* worst */
+  .c-2{background:#7A2228;color:#fff}
+  .c-3{background:#9A2D2D;color:#fff}
+  .c-4{background:#B23E33;color:#fff}
+  .c-5{background:#3D3D40;color:var(--tx)}
+  .c-6{background:#1F4A2C;color:#fff}
+  .c-7{background:#2A6739;color:#fff}
+  .c-8{background:#33874A;color:#fff}
+  .c-9{background:#3FA85C;color:#fff} /* best */
+
+  /* Donut */
+  .donut{
+    width:160px;height:160px;border-radius:50%;
+    background:conic-gradient(var(--pos) 0% 64%, var(--neg) 64% 98%, var(--tx3) 98% 100%);
+    position:relative;
+  }
+  .donut::after{content:'';position:absolute;inset:24%;background:var(--elev);border-radius:50%}
+  .donut-ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2}
+
+  /* Gauge */
+  .gauge{
+    width:160px;height:90px;position:relative;overflow:hidden;
+    border-radius:160px 160px 0 0;
+    background:conic-gradient(from 270deg,
+      var(--pos) 0deg, var(--pos) 60deg,
+      var(--warn) 60deg, var(--warn) 110deg,
+      var(--neg) 110deg, var(--neg) 180deg,
+      transparent 180deg);
+  }
+  .gauge::after{content:'';position:absolute;inset:14px 14px 0 14px;background:var(--elev);border-radius:160px 160px 0 0}
+  .gauge-needle{position:absolute;left:50%;bottom:0;width:1px;height:78%;
+    background:var(--acc);transform-origin:bottom center;
+    transform:translateX(-50%) rotate(-32deg);z-index:3}
+  .gauge-needle::after{content:'';position:absolute;top:-3px;left:-3px;width:7px;height:7px;border-radius:50%;background:var(--acc)}
+
+  /* Mini ISS gauge */
+  .mini-gauge{width:120px;height:68px;position:relative;overflow:hidden;border-radius:120px 120px 0 0;
+    background:conic-gradient(from 270deg,
+      var(--neg) 0deg 36deg,
+      var(--warn) 36deg 90deg,
+      var(--pos) 90deg 144deg,
+      #2DD881 144deg 180deg,
+      transparent 180deg);
+  }
+  .mini-gauge::after{content:'';position:absolute;inset:10px 10px 0 10px;background:var(--elev);border-radius:120px 120px 0 0}
+
+  /* Sparkline */
+  svg.spark{display:block}
+  svg.spark path{fill:none;stroke-width:1.25}
+
+  /* Vol heatmap */
+  .vh{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:2px}
+  .vh-cell{aspect-ratio:1.4/1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:9.5px;line-height:1.1;border:1px solid var(--bd);border-radius:2px;
+    transition:transform .15s, outline-color .15s; outline:1px solid transparent;cursor:pointer;padding:2px}
+  .vh-cell:hover{transform:scale(1.06);outline-color:var(--acc);z-index:2;position:relative}
+  .vh-cell .vh-sym{font-weight:600;font-size:10px}
+  .vh-cell .vh-ratio{opacity:.85}
+
+  /* Volume bar */
+  .vb{height:10px;width:100%;background:var(--elev2);border:1px solid var(--bd);border-radius:2px;overflow:hidden;position:relative}
+  .vb i{position:absolute;left:0;top:0;bottom:0;display:block}
+
+  /* Accordion */
+  details summary{list-style:none;cursor:pointer;outline:none}
+  details summary::-webkit-details-marker{display:none}
+  details[open] .chev{transform:rotate(90deg)}
+  .chev{transition:transform .25s;display:inline-block;color:var(--acc)}
+
+  /* Status dot */
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--pos)}
+  .dot.live{box-shadow:0 0 0 0 rgba(74,222,128,.55);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.5)}50%{box-shadow:0 0 0 5px rgba(74,222,128,0)}}
+  .blink{animation:blink 1.6s infinite}
+  @keyframes blink{50%{opacity:.35}}
+
+  /* selection */
+  ::selection{background:var(--acc);color:var(--bg)}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px}
+
+  /* Badge mark */
+  .badge-gold{background:linear-gradient(180deg,#F4A340,#C2761C);color:#1A0F02;font-weight:600;
+    padding:1px 6px;border-radius:2px;font-size:9.5px;font-family:'JetBrains Mono',monospace;letter-spacing:.05em;text-transform:uppercase}
+
+  /* Event row stripe */
+  .evt-stripe{box-shadow:inset 3px 0 0 var(--neg)}
+  .evt-stripe-info{box-shadow:inset 3px 0 0 var(--info)}
+  .evt-stripe-acc{box-shadow:inset 3px 0 0 var(--acc)}
+
+  /* Subtle data‑grid lines on bars */
+  .bar{position:relative;height:14px;background:var(--elev2);border:1px solid var(--bd);border-radius:2px;overflow:hidden}
+  .bar i{position:absolute;left:0;top:0;bottom:0;display:block}
+
+  /* Layout helpers */
+  .grid-12{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
+  .stretch-stripe{height:2px;background:linear-gradient(90deg,var(--acc),transparent 70%)}
+
+  /* Section spacing for the page */
+  section.page{padding:18px 28px}
+  @media (max-width:1280px){ section.page{padding:18px 16px} }
+
+  /* Sticky top strip */
+  .topbar{position:sticky;top:0;z-index:50;backdrop-filter:blur(8px);background:rgba(10,10,11,.86);border-bottom:1px solid var(--bd)}
+</style>
+</head>
+<body class="text-[13px]">
+
+<!-- ============ TOP STATUS BAR ============ -->
+<div class="topbar">
+  <div class="flex items-center justify-between px-7 py-2 text-[11px] mono">
+    <div class="flex items-center gap-5 tx2">
+      <span class="flex items-center gap-2"><span class="dot"></span><span class="text-[var(--pos)]">NSE · CLOSED</span></span>
+      <span>SUN&nbsp;10&nbsp;MAY&nbsp;2026</span>
+      <span>15:30 IST · last EOD load <span class="acc">2026-05-09 18:12</span></span>
+      <span>250 trading days · 50 / 50 ingested</span>
+    </div>
+    <div class="flex items-center gap-5 tx2">
+      <span><span class="tx3">Universe</span> &nbsp;NIFTY 50</span>
+      <span><span class="tx3">Latency</span> &nbsp;<span class="pos">42ms</span></span>
+      <span><span class="tx3">User</span> &nbsp;rahul@starfish</span>
+      <span class="acc">[?]</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BRAND HEADER ============ -->
+<header class="px-7 pt-9 pb-5">
+  <div class="flex items-end justify-between flex-wrap gap-4">
+    <div>
+      <div class="kicker mb-1.5">India Equities · Signal Terminal · <span class="acc">v1.0 — mock</span></div>
+      <h1 class="serif text-[64px] leading-[0.95] tracking-[-0.02em]">
+        Starfish<span class="acc">.</span><span class="serif italic tx2 text-[40px] ml-3">Nifty&nbsp;50</span>
+      </h1>
+      <div class="kicker mt-2">A daily briefing · drawdown · momentum · volume · events &nbsp;—&nbsp; on one page</div>
+    </div>
+
+    <!-- Date / digest -->
+    <div class="flex items-stretch gap-3">
+      <div class="panel px-4 py-3 min-w-[170px]">
+        <div class="kicker mb-1">Calc Date</div>
+        <div class="serif text-[32px] leading-none">10<span class="tx3">·</span>05<span class="tx3">·</span>26</div>
+        <div class="mono text-[10px] tx2 mt-1">▾ 250 prior dates</div>
+      </div>
+      <div class="panel px-4 py-3">
+        <div class="kicker mb-1.5 flex items-center gap-2"><span>☀ Morning Digest</span><span class="tx3">Top ISS</span></div>
+        <div class="flex gap-4">
+          <div>
+            <div class="serif text-[20px] leading-tight">BHARTIARTL</div>
+            <div class="mono text-[11px] tx2">ISS&nbsp;<span class="pos">81</span> · +2.15% · MOM</div>
+          </div>
+          <div class="border-l hl pl-4">
+            <div class="serif text-[20px] leading-tight">ADANIENT</div>
+            <div class="mono text-[11px] tx2">ISS&nbsp;<span class="pos">79</span> · +5.40% · EVT</div>
+          </div>
+          <div class="border-l hl pl-4">
+            <div class="serif text-[20px] leading-tight">ADANIPORTS</div>
+            <div class="mono text-[11px] tx2">ISS&nbsp;<span class="pos">77</span> · +2.95% · MOM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tricolor mt-6"></div>
+</header>
+
+<!-- ============ §01 MARKET OVERVIEW ============ -->
+<section class="page">
+  <div class="flex items-baseline gap-3 mb-3">
+    <span class="sec-num">§ 01</span>
+    <span class="kicker">Market Overview</span>
+    <span class="sec-rule"></span>
+    <span class="kicker tx3">always open</span>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="grid grid-cols-12 gap-3">
+    <!-- Index KPI -->
+    <div class="panel p-4 col-span-3 relative overflow-hidden">
+      <div class="kicker mb-1">Nifty 50 Index</div>
+      <div class="flex items-end gap-3">
+        <div class="serif text-[40px] leading-none">23,452<span class="tx3">.</span>80</div>
+        <div class="pos mono text-[14px] mb-1">+1.20%</div>
+      </div>
+      <div class="mt-3 flex items-center gap-3 mono text-[10px] tx2">
+        <span>1M&nbsp;<span class="pos">+2.40%</span></span>
+        <span>1Y&nbsp;<span class="pos">+18.60%</span></span>
+        <span>5Y&nbsp;<span class="pos">+95.30%</span></span>
+      </div>
+      <!-- inline 1M sparkline -->
+      <svg class="spark mt-2" viewBox="0 0 240 36" width="100%" height="32">
+        <path d="M0,28 L20,30 L40,24 L60,26 L80,18 L100,22 L120,16 L140,12 L160,16 L180,8 L200,12 L220,6 L240,10" stroke="#4ADE80"/>
+        <line x1="0" y1="28" x2="240" y2="28" stroke="#26262C" stroke-dasharray="2 3"/>
+      </svg>
+      <div class="absolute top-3 right-3 pill fill-pos pos">▲ Day</div>
+    </div>
+
+    <!-- 52W bracket -->
+    <div class="panel p-4 col-span-3">
+      <div class="kicker mb-1">52-Week Bracket</div>
+      <div class="flex items-baseline justify-between">
+        <div>
+          <div class="mono text-[18px]">19,425<span class="tx3"> · </span><span class="tx2">23,789</span></div>
+          <div class="mono text-[10px] tx3 mt-1">low 04 Jun 25 · high 22 Apr 26</div>
+        </div>
+        <div class="text-right">
+          <div class="kicker">from high</div>
+          <div class="mono neg text-[14px]">-1.41%</div>
+        </div>
+      </div>
+      <!-- range bar -->
+      <div class="mt-4 relative h-2 bg-[var(--elev2)] border hl rounded">
+        <div class="absolute inset-y-0 left-[12%] right-[6%] bg-[var(--acc)] opacity-30 rounded"></div>
+        <div class="absolute top-1/2 -translate-y-1/2 left-[92%] w-2 h-3 bg-[var(--acc)] rounded-sm"></div>
+      </div>
+      <div class="flex justify-between mono text-[9.5px] tx3 mt-1.5"><span>52WL</span><span>now</span><span>52WH</span></div>
+    </div>
+
+    <!-- Average constituent return -->
+    <div class="panel p-4 col-span-2">
+      <div class="kicker mb-1">Avg Constituent</div>
+      <div class="mono text-[20px] pos">+0.42%</div>
+      <div class="mono text-[10px] tx3">1D · equal-wt</div>
+      <div class="mt-3 mono text-[11px]">
+        <div class="flex justify-between"><span class="tx2">1M</span><span class="pos">+1.88%</span></div>
+        <div class="flex justify-between"><span class="tx2">1Y</span><span class="pos">+12.40%</span></div>
+        <div class="flex justify-between"><span class="tx2">vs Nifty</span><span class="warn">−6.20pp</span></div>
+      </div>
+      <div class="pill fill-warn warn mt-2">Breadth Divergence</div>
+    </div>
+
+    <!-- Volatility gauge -->
+    <div class="panel p-4 col-span-2 flex flex-col items-center">
+      <div class="kicker mb-1 self-start">Realized Vol · 20D</div>
+      <div class="relative">
+        <div class="gauge"></div>
+        <div class="gauge-needle"></div>
+      </div>
+      <div class="-mt-3 text-center">
+        <div class="serif text-[24px] leading-none">14.2<span class="tx3">%</span></div>
+        <div class="mono text-[10px] tx3">6M avg 13.5 · 1Y 15.8</div>
+      </div>
+    </div>
+
+    <!-- Breadth donut -->
+    <div class="panel p-4 col-span-2 flex items-center gap-4">
+      <div class="relative">
+        <div class="donut" style="background:conic-gradient(var(--pos) 0% 64%, var(--neg) 64% 98%, var(--tx3) 98% 100%);width:108px;height:108px"></div>
+        <div class="donut-ctr">
+          <div class="serif text-[28px] leading-none">32</div>
+          <div class="mono text-[9px] tx3 -mt-0.5">advancing</div>
+        </div>
+      </div>
+      <div class="text-[11px] mono leading-relaxed">
+        <div class="flex items-center gap-2"><span class="inline-block w-2 h-2" style="background:var(--pos)"></span> 32 Adv</div>
+        <div class="flex items-center gap-2"><span class="inline-block w-2 h-2" style="background:var(--neg)"></span> 17 Dec</div>
+        <div class="flex items-center gap-2"><span class="inline-block w-2 h-2" style="background:var(--tx3)"></span> 01 Unch</div>
+        <div class="kicker mt-2">window · 1D</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hero composition: sector breadth (left) + treemap (right) -->
+  <div class="grid grid-cols-12 gap-3 mt-3">
+
+    <!-- Sector breadth table -->
+    <div class="panel col-span-5">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div>
+          <div class="kicker">1.2 · Sector Breadth</div>
+          <div class="serif text-[20px] leading-tight mt-0.5">13 sectors · 50 names</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input class="sub px-2 py-1 mono text-[11px] w-40 outline-none focus:border-[var(--acc)]" placeholder="filter sector…" />
+          <span class="tag mono">▾ sort 1D</span>
+        </div>
+      </div>
+      <table class="dense">
+        <thead><tr>
+          <th>Sector</th><th class="r">N</th><th class="r">Adv</th><th class="r">Dec</th>
+          <th class="r">Avg 1D</th><th class="r">Avg 1M</th><th class="r">Avg 1Y</th><th class="r">Avg ISS</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="sym">Infrastructure</td><td class="r">2</td><td class="r pos">2</td><td class="r tx3">0</td><td class="r pos">+4.15%</td><td class="r pos">+9.20%</td><td class="r pos">+32.40%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:78%;background:var(--pos)"></span></span><span>78</span></span></td></tr>
+          <tr><td class="sym">Telecom</td><td class="r">1</td><td class="r pos">1</td><td class="r tx3">0</td><td class="r pos">+2.15%</td><td class="r pos">+6.80%</td><td class="r pos">+35.40%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:81%;background:var(--pos)"></span></span><span>81</span></span></td></tr>
+          <tr><td class="sym">Metals</td><td class="r">3</td><td class="r pos">3</td><td class="r tx3">0</td><td class="r pos">+3.45%</td><td class="r pos">+5.10%</td><td class="r pos">+15.20%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:73%;background:var(--pos)"></span></span><span>73</span></span></td></tr>
+          <tr><td class="sym">Auto</td><td class="r">6</td><td class="r pos">5</td><td class="r neg">1</td><td class="r pos">+1.85%</td><td class="r pos">+4.40%</td><td class="r pos">+24.30%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:71%;background:var(--pos)"></span></span><span>71</span></span></td></tr>
+          <tr><td class="sym">Energy</td><td class="r">4</td><td class="r pos">4</td><td class="r tx3">0</td><td class="r pos">+1.40%</td><td class="r pos">+3.20%</td><td class="r pos">+18.60%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:68%;background:var(--pos)"></span></span><span>68</span></span></td></tr>
+          <tr><td class="sym">Utilities</td><td class="r">2</td><td class="r pos">2</td><td class="r tx3">0</td><td class="r pos">+1.20%</td><td class="r pos">+2.85%</td><td class="r pos">+28.40%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:65%;background:var(--pos)"></span></span><span>65</span></span></td></tr>
+          <tr><td class="sym">Healthcare</td><td class="r">1</td><td class="r pos">1</td><td class="r tx3">0</td><td class="r pos">+0.85%</td><td class="r pos">+1.40%</td><td class="r pos">+14.20%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:64%;background:var(--pos)"></span></span><span>64</span></span></td></tr>
+          <tr><td class="sym">Financials</td><td class="r">9</td><td class="r pos">5</td><td class="r neg">4</td><td class="r pos">+0.45%</td><td class="r warn">−0.80%</td><td class="r pos">+12.40%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:60%;background:var(--pos)"></span></span><span>60</span></span></td></tr>
+          <tr><td class="sym">Insurance</td><td class="r">2</td><td class="r tx3">1</td><td class="r tx3">1</td><td class="r tx2">−0.05%</td><td class="r tx2">+0.40%</td><td class="r pos">+6.40%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:56%;background:var(--warn)"></span></span><span>56</span></span></td></tr>
+          <tr style="background:rgba(248,113,113,.05)"><td class="sym">Consumer</td><td class="r">7</td><td class="r neg">2</td><td class="r neg">5</td><td class="r neg">−1.10%</td><td class="r neg">−2.10%</td><td class="r neg">−2.40%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:51%;background:var(--warn)"></span></span><span>51</span></span></td></tr>
+          <tr><td class="sym">IT</td><td class="r">6</td><td class="r tx3">0</td><td class="r neg">6</td><td class="r neg">−1.05%</td><td class="r neg">−3.40%</td><td class="r neg">−8.20%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:50%;background:var(--warn)"></span></span><span>50</span></span></td></tr>
+          <tr style="background:rgba(248,113,113,.07)"><td class="sym">Pharma</td><td class="r">4</td><td class="r tx3">0</td><td class="r neg">4</td><td class="r neg">−1.30%</td><td class="r neg">−1.90%</td><td class="r pos">+5.40%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:47%;background:var(--warn)"></span></span><span>47</span></span></td></tr>
+          <tr><td class="sym">Cement</td><td class="r">2</td><td class="r tx3">0</td><td class="r neg">2</td><td class="r neg">−1.65%</td><td class="r neg">−2.80%</td><td class="r pos">+3.20%</td><td class="r"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:43%;background:var(--neg)"></span></span><span>43</span></span></td></tr>
+        </tbody>
+      </table>
+      <div class="px-4 py-2 border-t hl mono text-[10px] tx3 flex justify-between">
+        <span>↻ click any row to drill into Primary Scanner</span>
+        <span>13 of 13 visible</span>
+      </div>
+    </div>
+
+    <!-- Treemap heatmap -->
+    <div class="panel col-span-7 flex flex-col">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div>
+          <div class="kicker">1.6 · Performance Heatmap</div>
+          <div class="serif text-[20px] leading-tight mt-0.5">Cells sized by free-float mcap · color by return</div>
+        </div>
+        <div class="flex items-center gap-1.5 mono text-[11px]">
+          <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">1D</span>
+          <span class="tag">1M</span>
+          <span class="tag">1Y</span>
+        </div>
+      </div>
+
+      <div class="p-3 grow">
+        <div class="tm-wrap" style="height:380px">
+          <!-- Row 1 -->
+          <div class="tm-row" style="flex:1.6">
+            <!-- Financials block -->
+            <div class="tm-block" style="flex:0.42">
+              <span class="lbl">Financials</span>
+              <div class="tm-row" style="flex:1">
+                <div class="tm-cell c-7" style="flex:1.5"><span class="sym">HDFCBANK</span><span class="ret pos">+0.45%</span></div>
+                <div class="tm-cell c-8" style="flex:1.2"><span class="sym">ICICIBANK</span><span class="ret pos">+1.85%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.8">
+                <div class="tm-cell c-7" style="flex:1"><span class="sym">SBIN</span><span class="ret pos">+1.50%</span></div>
+                <div class="tm-cell c-6" style="flex:.8"><span class="sym">KOTAKBANK</span><span class="ret pos">+0.30%</span></div>
+                <div class="tm-cell c-7" style="flex:.8"><span class="sym">AXISBANK</span><span class="ret pos">+0.80%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.6">
+                <div class="tm-cell c-1" style="flex:1.4"><span class="sym">INDUSINDBK</span><span class="ret neg">-4.20%</span></div>
+                <div class="tm-cell c-3" style="flex:1"><span class="sym">BAJFINANCE</span><span class="ret neg">-3.20%</span></div>
+                <div class="tm-cell c-3" style="flex:.7"><span class="sym">BAJAJFINSV</span><span class="ret neg">-2.85%</span></div>
+                <div class="tm-cell c-7" style="flex:.6"><span class="sym">SHRIRAMFIN</span><span class="ret pos">+2.15%</span></div>
+              </div>
+            </div>
+
+            <!-- Energy + Telecom + Auto leaders -->
+            <div class="tm-block" style="flex:0.32">
+              <span class="lbl">Energy / Telecom</span>
+              <div class="tm-row" style="flex:1">
+                <div class="tm-cell c-7" style="flex:2"><span class="sym">RELIANCE</span><span class="ret pos">+1.20%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.7">
+                <div class="tm-cell c-7" style="flex:1"><span class="sym">ONGC</span><span class="ret pos">+1.85%</span></div>
+                <div class="tm-cell c-7" style="flex:.7"><span class="sym">COALINDIA</span><span class="ret pos">+1.20%</span></div>
+                <div class="tm-cell c-6" style="flex:.6"><span class="sym">BPCL</span><span class="ret pos">+1.10%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.7">
+                <div class="tm-cell c-8" style="flex:1.4"><span class="sym">BHARTIARTL</span><span class="ret pos">+2.15%</span></div>
+                <div class="tm-cell c-8" style="flex:.9"><span class="sym">ADANIENT</span><span class="ret pos">+5.40%</span></div>
+              </div>
+            </div>
+
+            <!-- IT block -->
+            <div class="tm-block" style="flex:0.26">
+              <span class="lbl">IT</span>
+              <div class="tm-row" style="flex:1">
+                <div class="tm-cell c-3" style="flex:1.5"><span class="sym">TCS</span><span class="ret neg">-1.10%</span></div>
+                <div class="tm-cell c-3" style="flex:1.2"><span class="sym">INFY</span><span class="ret neg">-0.85%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.6">
+                <div class="tm-cell c-3" style="flex:1"><span class="sym">HCLTECH</span><span class="ret neg">-0.55%</span></div>
+                <div class="tm-cell c-3" style="flex:.8"><span class="sym">WIPRO</span><span class="ret neg">-1.20%</span></div>
+                <div class="tm-cell c-2" style="flex:.7"><span class="sym">TECHM</span><span class="ret neg">-1.45%</span></div>
+                <div class="tm-cell c-2" style="flex:.7"><span class="sym">LTIM</span><span class="ret neg">-1.95%</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2 -->
+          <div class="tm-row" style="flex:1">
+            <!-- Auto -->
+            <div class="tm-block" style="flex:0.30">
+              <span class="lbl">Auto</span>
+              <div class="tm-row" style="flex:1">
+                <div class="tm-cell c-8" style="flex:1.4"><span class="sym">M&M</span><span class="ret pos">+2.50%</span></div>
+                <div class="tm-cell c-8" style="flex:1.2"><span class="sym">TATAMOTORS</span><span class="ret pos">+3.80%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.8">
+                <div class="tm-cell c-5" style="flex:1.2"><span class="sym">MARUTI</span><span class="ret neg">-0.40%</span></div>
+                <div class="tm-cell c-7" style="flex:1"><span class="sym">BAJAJ-AUTO</span><span class="ret pos">+1.65%</span></div>
+                <div class="tm-cell c-7" style="flex:.9"><span class="sym">EICHERMOT</span><span class="ret pos">+1.45%</span></div>
+                <div class="tm-cell c-7" style="flex:.7"><span class="sym">HEROMOTOCO</span><span class="ret pos">+1.95%</span></div>
+              </div>
+            </div>
+
+            <!-- Consumer -->
+            <div class="tm-block" style="flex:0.30">
+              <span class="lbl">Consumer</span>
+              <div class="tm-row" style="flex:1">
+                <div class="tm-cell c-3" style="flex:1.4"><span class="sym">HINDUNILVR</span><span class="ret neg">-1.20%</span></div>
+                <div class="tm-cell c-3" style="flex:1.2"><span class="sym">ITC</span><span class="ret neg">-0.65%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.7">
+                <div class="tm-cell c-2" style="flex:1.1"><span class="sym">ASIANPAINT</span><span class="ret neg">-2.40%</span></div>
+                <div class="tm-cell c-3" style="flex:.9"><span class="sym">NESTLEIND</span><span class="ret neg">-0.95%</span></div>
+                <div class="tm-cell c-7" style="flex:.7"><span class="sym">TITAN</span><span class="ret pos">+1.10%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.55">
+                <div class="tm-cell c-3" style="flex:1"><span class="sym">BRITANNIA</span><span class="ret neg">-1.80%</span></div>
+                <div class="tm-cell c-3" style="flex:.9"><span class="sym">TATACONSUM</span><span class="ret neg">-0.85%</span></div>
+              </div>
+            </div>
+
+            <!-- Pharma -->
+            <div class="tm-block" style="flex:0.18">
+              <span class="lbl">Pharma</span>
+              <div class="tm-row" style="flex:1">
+                <div class="tm-cell c-7" style="flex:1.2"><span class="sym">SUNPHARMA</span><span class="ret pos">+0.65%</span></div>
+                <div class="tm-cell c-3" style="flex:1"><span class="sym">DRREDDY</span><span class="ret neg">-2.10%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.7">
+                <div class="tm-cell c-3" style="flex:1"><span class="sym">CIPLA</span><span class="ret neg">-0.75%</span></div>
+                <div class="tm-cell c-2" style="flex:.9"><span class="sym">DIVISLAB</span><span class="ret neg">-3.50%</span></div>
+              </div>
+            </div>
+
+            <!-- Metals + Cement + Util + Insurance + Health -->
+            <div class="tm-block" style="flex:0.22">
+              <span class="lbl">Metals · Util · Other</span>
+              <div class="tm-row" style="flex:1">
+                <div class="tm-cell c-9" style="flex:1.2"><span class="sym">TATASTEEL</span><span class="ret pos">+4.20%</span></div>
+                <div class="tm-cell c-8" style="flex:1"><span class="sym">HINDALCO</span><span class="ret pos">+3.40%</span></div>
+                <div class="tm-cell c-8" style="flex:1"><span class="sym">JSWSTEEL</span><span class="ret pos">+2.80%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.65">
+                <div class="tm-cell c-7" style="flex:1"><span class="sym">NTPC</span><span class="ret pos">+1.40%</span></div>
+                <div class="tm-cell c-7" style="flex:.9"><span class="sym">POWERGRID</span><span class="ret pos">+0.95%</span></div>
+                <div class="tm-cell c-3" style="flex:.9"><span class="sym">ULTRACEM</span><span class="ret neg">-1.85%</span></div>
+              </div>
+              <div class="tm-row" style="flex:.55">
+                <div class="tm-cell c-3" style="flex:1"><span class="sym">GRASIM</span><span class="ret neg">-1.40%</span></div>
+                <div class="tm-cell c-3" style="flex:.9"><span class="sym">HDFCLIFE</span><span class="ret neg">-0.55%</span></div>
+                <div class="tm-cell c-7" style="flex:.7"><span class="sym">SBILIFE</span><span class="ret pos">+0.45%</span></div>
+                <div class="tm-cell c-8" style="flex:1"><span class="sym">ADANIPORTS</span><span class="ret pos">+2.95%</span></div>
+                <div class="tm-cell c-7" style="flex:.7"><span class="sym">APOLLO</span><span class="ret pos">+0.85%</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex items-center justify-between mt-3 mono text-[10px] tx3">
+          <div class="flex items-center gap-1.5">
+            <span>−5%</span>
+            <span class="inline-block w-5 h-3" style="background:#5A1A1F"></span>
+            <span class="inline-block w-5 h-3" style="background:#9A2D2D"></span>
+            <span class="inline-block w-5 h-3" style="background:#3D3D40"></span>
+            <span class="inline-block w-5 h-3" style="background:#2A6739"></span>
+            <span class="inline-block w-5 h-3" style="background:#3FA85C"></span>
+            <span>+5%</span>
+            <span class="ml-3">scale anchored to p5/p95 daily</span>
+          </div>
+          <div>↻ click cell → drill scanner · gold border = 52W high · dark border = 52W low</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ §02 WATCHLIST (always open) ============ -->
+<section class="page">
+  <div class="flex items-baseline gap-3 mb-3">
+    <span class="sec-num">§ 02</span>
+    <span class="kicker">Watchlist · Auto-curated + Pinned</span>
+    <span class="sec-rule"></span>
+    <span class="kicker tx3">always open · ISS-driven</span>
+  </div>
+
+  <div class="grid grid-cols-12 gap-3">
+    <!-- Tabs + table -->
+    <div class="panel col-span-9">
+      <div class="px-4 pt-3 flex items-center justify-between border-b hl">
+        <div class="flex gap-1 mono text-[11px]">
+          <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">Contrarian Opportunities · 4</span>
+          <span class="tag">Momentum Leaders · 5</span>
+          <span class="tag">Event-Driven · 3</span>
+          <span class="tag">Volume-Confirmed · 6</span>
+        </div>
+        <div class="flex items-center gap-2 py-2">
+          <input class="sub px-2 py-1 mono text-[11px] w-44 outline-none focus:border-[var(--acc)]" placeholder="filter symbol / sector / reason…" />
+          <button class="tag mono">⤓ CSV</button>
+          <button class="tag mono">📌 manage pins</button>
+        </div>
+      </div>
+
+      <table class="dense">
+        <thead><tr>
+          <th style="width:32px"></th>
+          <th>Symbol</th><th>Company · Sector</th>
+          <th class="r">Mcap ₹ Cr</th>
+          <th class="c">ISS</th>
+          <th>Primary Signal</th>
+          <th>Key Reason</th>
+          <th>Last Event</th>
+          <th class="r">Days</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td class="acc text-center">★</td>
+            <td class="sym">RELIANCE</td>
+            <td class="tx2">Reliance Industries · Energy</td>
+            <td class="r">19,32,840</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:72%;background:var(--pos)"></span></span><span class="pos">72</span></span></td>
+            <td><span class="pill fill-info info">Accumulation</span></td>
+            <td class="tx2">Sector leader, 1.4% off 52W high · vol falling</td>
+            <td class="mono tx2">Earn · 12 May</td>
+            <td class="r tx2">14</td>
+          </tr>
+          <tr>
+            <td class="acc text-center">★</td>
+            <td class="sym">BHARTIARTL</td>
+            <td class="tx2">Bharti Airtel · Telecom</td>
+            <td class="r">8,65,420</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:81%;background:var(--pos)"></span></span><span class="pos">81</span></span></td>
+            <td><span class="pill fill-pos pos">Momentum</span> <span class="badge-gold">Triple Conf</span></td>
+            <td class="tx2">3M +22.8% · vol expansion · earnings beat</td>
+            <td class="mono tx2">Earn · 02 May</td>
+            <td class="r tx2">8</td>
+          </tr>
+          <tr style="background:rgba(167,139,250,.04)">
+            <td class="acc text-center">★</td>
+            <td class="sym">ADANIENT</td>
+            <td class="tx2">Adani Enterprises · Infrastructure</td>
+            <td class="r">3,28,640</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:79%;background:var(--pos)"></span></span><span class="pos">79</span></span></td>
+            <td><span class="pill fill-evt evt">Event-Driven</span></td>
+            <td class="tx2">Large-order announcement +5.4% · monitor follow-through</td>
+            <td class="mono tx2">L.Order · 09 May</td>
+            <td class="r tx2">3</td>
+          </tr>
+          <tr style="background:rgba(248,113,113,.05)">
+            <td class="acc text-center">★</td>
+            <td class="sym">INDUSINDBK</td>
+            <td class="tx2">IndusInd Bank · Financials</td>
+            <td class="r">76,820</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:24%;background:var(--neg)"></span></span><span class="neg">24</span></span></td>
+            <td><span class="pill fill-neg neg">Falling Knife</span> <span class="pill fill-warn warn">New Risk Event</span></td>
+            <td class="tx2">−38.4% from high, vol rising · RBI flagged accounting</td>
+            <td class="mono neg">Reg · 08 May</td>
+            <td class="r tx2">22</td>
+          </tr>
+          <tr>
+            <td class="acc text-center">★</td>
+            <td class="sym">BAJFINANCE</td>
+            <td class="tx2">Bajaj Finance · Financials</td>
+            <td class="r">4,32,180</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:28%;background:var(--neg)"></span></span><span class="neg">28</span></span></td>
+            <td><span class="pill fill-info info">Accumulation</span> <span class="pill fill-warn warn">Below threshold — review</span></td>
+            <td class="tx2">−28.6% drawdown · selling exhaustion likely</td>
+            <td class="mono tx2">Earn · 28 Apr</td>
+            <td class="r warn">42</td>
+          </tr>
+          <tr>
+            <td class="text-center tx3">·</td>
+            <td class="sym">TATAMOTORS</td>
+            <td class="tx2">Tata Motors · Auto</td>
+            <td class="r">3,12,560</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:78%;background:var(--pos)"></span></span><span class="pos">78</span></span></td>
+            <td><span class="pill fill-pos pos">Momentum · Confirmed</span></td>
+            <td class="tx2">3M +28.4% · volume-confirmed trend, no single event</td>
+            <td class="mono tx2">—</td>
+            <td class="r tx2">5</td>
+          </tr>
+          <tr>
+            <td class="text-center tx3">·</td>
+            <td class="sym">ASIANPAINT</td>
+            <td class="tx2">Asian Paints · Consumer</td>
+            <td class="r">2,73,940</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:32%;background:var(--neg)"></span></span><span class="neg">32</span></span></td>
+            <td><span class="pill fill-info info">Accumulation</span></td>
+            <td class="tx2">Down 24.2% from 52W high · 1Y −18.4% · falling vol</td>
+            <td class="mono tx2">—</td>
+            <td class="r tx2">11</td>
+          </tr>
+          <tr>
+            <td class="text-center tx3">·</td>
+            <td class="sym">DIVISLAB</td>
+            <td class="tx2">Divi's Laboratories · Pharma</td>
+            <td class="r">1,23,580</td>
+            <td class="c"><span class="iss-bar"><span class="iss-track"><span class="iss-fill" style="width:35%;background:var(--neg)"></span></span><span class="neg">35</span></span></td>
+            <td><span class="pill fill-warn warn">Needs Event Review</span></td>
+            <td class="tx2">−22.8% drawdown · earnings 18 May (within 14d)</td>
+            <td class="mono evt">Earn · in 8d</td>
+            <td class="r tx2">3</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="px-4 py-2 border-t hl mono text-[10px] tx3 flex justify-between">
+        <span>★ pinned · ↻ click row → ISS gauge updates →</span>
+        <span>showing 8 · 14 in current tab</span>
+      </div>
+    </div>
+
+    <!-- ISS Gauge sidebar -->
+    <div class="panel col-span-3 p-4 sticky top-12 self-start">
+      <div class="kicker mb-1">7.3 · ISS Gauge</div>
+      <div class="serif text-[20px] leading-tight">BHARTIARTL <span class="tx3 text-[14px]">selected</span></div>
+
+      <div class="flex justify-center mt-4">
+        <div class="relative">
+          <div class="mini-gauge"></div>
+          <div class="absolute inset-0 flex flex-col items-center justify-end pb-1">
+            <div class="serif text-[34px] leading-none pos">81</div>
+            <div class="kicker">composite</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 space-y-2 text-[11px] mono">
+        <div>
+          <div class="flex justify-between mb-0.5"><span class="tx2">Price Momentum</span><span>17 / 20</span></div>
+          <div class="bar"><i style="width:85%;background:var(--pos)"></i></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-0.5"><span class="tx2">Volume Quality</span><span>16 / 20</span></div>
+          <div class="bar"><i style="width:80%;background:var(--pos)"></i></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-0.5"><span class="tx2">Drawdown / Recovery</span><span>14 / 20</span></div>
+          <div class="bar"><i style="width:70%;background:var(--pos)"></i></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-0.5"><span class="tx2">Corporate Event</span><span>18 / 20</span></div>
+          <div class="bar"><i style="width:90%;background:var(--acc)"></i></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-0.5"><span class="tx2">Relative Strength</span><span>16 / 20</span></div>
+          <div class="bar"><i style="width:80%;background:var(--info)"></i></div>
+        </div>
+      </div>
+      <div class="mt-3 pt-3 border-t hl mono text-[10px] tx3 leading-relaxed">
+        Composite of 5 factors · weights v1.0<br>
+        Updates on row hover/click. Sticky panel.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ §03 TREND WORKBENCH ============ -->
+<section class="page">
+  <div class="flex items-baseline gap-3 mb-3">
+    <span class="sec-num">§ 03</span>
+    <span class="kicker">Trend Workbench · Multi-Day Analysis</span>
+    <span class="sec-rule"></span>
+    <span class="kicker tx3">always open · price · volume · ISS over time</span>
+  </div>
+
+  <!-- Filter row -->
+  <div class="panel p-3 flex items-center gap-3 flex-wrap mono text-[11px] mb-3">
+    <span class="kicker">Mode</span>
+    <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">Stock</span>
+    <span class="tag">Sector</span>
+    <span class="tag">Compare ≤ 3</span>
+
+    <span class="kicker ml-3">Subject</span>
+    <span class="tag" style="color:var(--acc);border-color:var(--acc)">RELIANCE&nbsp;<span class="tx3">✕</span></span>
+    <span class="tag tx2">+ add ▾</span>
+    <span class="tag tx3">benchmark · NIFTY 50</span>
+
+    <span class="kicker ml-3">Period</span>
+    <span class="tag">1M</span>
+    <span class="tag">3M</span>
+    <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">6M</span>
+    <span class="tag">1Y</span>
+    <span class="tag">3Y</span>
+    <span class="tag">YTD</span>
+    <span class="tag">Custom</span>
+
+    <span class="kicker ml-3">Overlay</span>
+    <span class="tag" style="color:var(--evt);border-color:var(--evt)">Events ●</span>
+    <span class="tag" style="color:var(--acc);border-color:var(--acc)">52WH/L</span>
+    <span class="tag" style="color:var(--info);border-color:var(--info)">RS · Nifty</span>
+    <span class="tag">SMA 50</span>
+    <span class="tag">SMA 200</span>
+
+    <span class="ml-auto kicker">↻ click any row in §02–§08 to focus subject here</span>
+  </div>
+
+  <div class="grid grid-cols-12 gap-3">
+
+    <!-- Main chart column -->
+    <div class="panel col-span-9 flex flex-col">
+
+      <!-- Header: subject -->
+      <div class="px-4 py-3 border-b hl flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <div class="kicker">RELIANCE · Reliance Industries · Energy · ISIN INE002A01018</div>
+          <div class="flex items-baseline gap-3 mt-1">
+            <div class="serif text-[34px] leading-none">₹2,856<span class="tx3">.</span>40</div>
+            <div class="mono text-[14px] pos">+1.20%</div>
+            <div class="mono text-[11px] tx3">1D · close</div>
+            <div class="border-l hl pl-3 ml-2">
+              <div class="kicker">period · 6M</div>
+              <div class="mono text-[14px] pos">+15.42% &nbsp; <span class="tx3">vs Nifty</span> <span class="pos">+5.62pp</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-end gap-4">
+          <div class="text-right">
+            <div class="kicker">52W bracket</div>
+            <div class="mono text-[12px] tx2">2,392 <span class="tx3">→</span> <span class="acc">2,894</span></div>
+            <div class="mono text-[10px] tx3">−1.41% from high</div>
+          </div>
+          <div class="text-right">
+            <div class="kicker">ISS today / 6M avg</div>
+            <div class="mono text-[14px] pos">72 <span class="tx3 text-[11px]">/ 68</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Price chart -->
+      <div class="px-4 pt-3 pb-1">
+        <svg viewBox="0 0 800 240" class="w-full" style="height:240px" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="px-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#F4A340" stop-opacity=".30"/>
+              <stop offset="100%" stop-color="#F4A340" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+
+          <g stroke="#26262C" stroke-dasharray="2 4">
+            <line x1="0" y1="48" x2="800" y2="48"/>
+            <line x1="0" y1="96" x2="800" y2="96"/>
+            <line x1="0" y1="144" x2="800" y2="144"/>
+            <line x1="0" y1="192" x2="800" y2="192"/>
+          </g>
+          <g font-family="JetBrains Mono" font-size="9" fill="#57575E">
+            <text x="796" y="14">2,900</text>
+            <text x="796" y="50">2,800</text>
+            <text x="796" y="98">2,700</text>
+            <text x="796" y="146">2,600</text>
+            <text x="796" y="194">2,500</text>
+            <text x="796" y="232">2,400</text>
+          </g>
+
+          <line x1="0" y1="14" x2="800" y2="14" stroke="#F4A340" stroke-dasharray="3 3" opacity=".55"/>
+          <text x="6" y="11" font-family="JetBrains Mono" font-size="9" fill="#F4A340">52WH 2,894 · 22 Apr</text>
+          <line x1="0" y1="225" x2="800" y2="225" stroke="#F4A340" stroke-dasharray="3 3" opacity=".25"/>
+          <text x="6" y="237" font-family="JetBrains Mono" font-size="9" fill="#8B8B92">52WL 2,392 · 04 Nov</text>
+
+          <path d="M0,180 L40,178 L80,172 L120,170 L160,168 L200,160 L240,156 L280,154 L320,148 L360,142 L400,140 L440,136 L480,128 L520,124 L560,118 L600,116 L640,112 L680,108 L720,104 L760,100 L800,102"
+            stroke="#60A5FA" stroke-width="1" stroke-dasharray="3 2" fill="none" opacity=".7"/>
+
+          <path d="M0,176 L40,170 L80,162 L120,156 L160,150 L200,144 L240,140 L280,134 L320,128 L360,122 L400,116 L440,110 L480,102 L520,96 L560,88 L600,82 L640,74 L680,66 L720,60 L760,54 L800,52"
+            stroke="#F4F4F0" stroke-width=".75" stroke-dasharray="1 2" fill="none" opacity=".35"/>
+
+          <path d="M0,182 L40,176 L80,168 L120,162 L160,158 L200,150 L240,144 L280,138 L320,124 L360,114 L400,100 L440,94 L480,88 L520,82 L560,72 L600,70 L640,64 L680,56 L720,52 L760,46 L800,52 L800,240 L0,240 Z"
+            fill="url(#px-grad)"/>
+          <path d="M0,182 L40,176 L80,168 L120,162 L160,158 L200,150 L240,144 L280,138 L320,124 L360,114 L400,100 L440,94 L480,88 L520,82 L560,72 L600,70 L640,64 L680,56 L720,52 L760,46 L800,52"
+            stroke="#F4A340" stroke-width="1.5" fill="none"/>
+
+          <g>
+            <line x1="100" y1="0" x2="100" y2="240" stroke="#60A5FA" stroke-dasharray="2 3" opacity=".55"/>
+            <circle cx="100" cy="167" r="3.5" fill="#60A5FA" stroke="#0A0A0B" stroke-width="1"/>
+            <text x="106" y="22" font-family="JetBrains Mono" font-size="9" fill="#60A5FA">Earn −1.1%</text>
+
+            <line x1="280" y1="0" x2="280" y2="240" stroke="#60A5FA" stroke-dasharray="2 3" opacity=".55"/>
+            <circle cx="280" cy="138" r="3.5" fill="#60A5FA" stroke="#0A0A0B" stroke-width="1"/>
+            <text x="286" y="22" font-family="JetBrains Mono" font-size="9" fill="#60A5FA">Earn +3.4%</text>
+
+            <line x1="450" y1="0" x2="450" y2="240" stroke="#A78BFA" stroke-dasharray="2 3" opacity=".55"/>
+            <circle cx="450" cy="96" r="3.5" fill="#A78BFA" stroke="#0A0A0B" stroke-width="1"/>
+            <text x="456" y="22" font-family="JetBrains Mono" font-size="9" fill="#A78BFA">L.Order ₹1,200 Cr</text>
+
+            <line x1="620" y1="0" x2="620" y2="240" stroke="#4ADE80" stroke-dasharray="2 3" opacity=".55"/>
+            <circle cx="620" cy="68" r="3.5" fill="#4ADE80" stroke="#0A0A0B" stroke-width="1"/>
+            <text x="626" y="22" font-family="JetBrains Mono" font-size="9" fill="#4ADE80">Div ₹16</text>
+
+            <line x1="760" y1="0" x2="760" y2="240" stroke="#F4A340" stroke-dasharray="2 3" opacity=".55"/>
+            <circle cx="760" cy="46" r="3.5" fill="#F4A340" stroke="#0A0A0B" stroke-width="1"/>
+            <text x="700" y="42" font-family="JetBrains Mono" font-size="9" fill="#F4A340">52WH 22 Apr</text>
+          </g>
+
+          <line x1="540" y1="0" x2="540" y2="240" stroke="#F4F4F0" stroke-dasharray="1 2" opacity=".30"/>
+          <circle cx="540" cy="76" r="4.5" fill="#F4A340" stroke="#0A0A0B" stroke-width="2"/>
+
+          <g transform="translate(548, 60)">
+            <rect x="0" y="0" width="120" height="44" rx="2" fill="#0A0A0B" stroke="#3A3A42"/>
+            <text x="8" y="14" font-family="JetBrains Mono" font-size="9" fill="#8B8B92">2026-04-04 · Fri</text>
+            <text x="8" y="28" font-family="JetBrains Mono" font-size="10" fill="#F4F4F0">2,748.20 <tspan fill="#4ADE80">+1.4%</tspan></text>
+            <text x="8" y="40" font-family="JetBrains Mono" font-size="9" fill="#8B8B92">vol 11.2M · 1.36×</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Volume bars -->
+      <div class="px-4 pt-0 pb-2">
+        <div class="kicker mb-1 flex justify-between"><span>Daily volume</span><span class="tx3">avg 8.2M · color = day return</span></div>
+        <svg id="vol-bars" viewBox="0 0 800 64" class="w-full" style="height:64px" preserveAspectRatio="none">
+          <line x1="0" y1="42" x2="800" y2="42" stroke="#26262C" stroke-dasharray="2 4"/>
+          <text x="796" y="40" font-family="JetBrains Mono" font-size="9" fill="#57575E" text-anchor="end">avg 20D</text>
+        </svg>
+      </div>
+
+      <!-- Calendar heatmap -->
+      <div class="px-4 py-3 border-t hl">
+        <div class="kicker mb-2 flex justify-between">
+          <span>Daily Return Calendar — last 1Y · 252 trading days</span>
+          <span class="tx3">color anchored to p5 / p95 of subject distribution</span>
+        </div>
+        <div id="cal-heatmap" class="w-full" style="display:grid;grid-template-rows:repeat(5,10px);grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px"></div>
+        <div class="flex items-center justify-between mt-2 mono text-[10px] tx3">
+          <div class="flex items-center gap-1.5">
+            <span>Mon → Fri</span>
+            <span class="ml-3">−3%</span>
+            <span class="inline-block w-4 h-2.5" style="background:#5A1A1F"></span>
+            <span class="inline-block w-4 h-2.5" style="background:#7A2228"></span>
+            <span class="inline-block w-4 h-2.5" style="background:#9A2D2D"></span>
+            <span class="inline-block w-4 h-2.5" style="background:#2C2C30"></span>
+            <span class="inline-block w-4 h-2.5" style="background:#2A6739"></span>
+            <span class="inline-block w-4 h-2.5" style="background:#33874A"></span>
+            <span class="inline-block w-4 h-2.5" style="background:#3FA85C"></span>
+            <span>+3%</span>
+          </div>
+          <div>longest streak ▲ 7 · ▼ 5 · ↻ hover cell for date / return / vol</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats / events sidebar -->
+    <div class="panel col-span-3 flex flex-col">
+      <div class="px-4 py-3 border-b hl">
+        <div class="kicker">Period stats · 6M · vs Nifty 50</div>
+        <div class="serif text-[20px] leading-tight mt-0.5">RELIANCE</div>
+      </div>
+
+      <table class="dense" style="border:none">
+        <tbody>
+          <tr><td class="tx2">Return</td><td class="r pos">+15.42%</td></tr>
+          <tr><td class="tx2">vs Nifty (α)</td><td class="r pos">+5.62 pp</td></tr>
+          <tr><td class="tx2">Max drawdown</td><td class="r neg">−7.84%</td></tr>
+          <tr><td class="tx2">Realized vol (ann.)</td><td class="r">14.5%</td></tr>
+          <tr><td class="tx2">Sharpe (rf=6%)</td><td class="r pos">1.18</td></tr>
+          <tr><td class="tx2">Avg daily vol</td><td class="r">8.21 M</td></tr>
+          <tr><td class="tx2">Avg delivery %</td><td class="r">62.3%</td></tr>
+          <tr><td class="tx2">Vol expansion days</td><td class="r warn">14 / 130</td></tr>
+          <tr><td class="tx2">RS rank · Nifty 50</td><td class="r acc">12 / 50</td></tr>
+          <tr><td class="tx2">% days &gt; SMA 50</td><td class="r pos">82%</td></tr>
+          <tr><td class="tx2">ISS now / period avg</td><td class="r"><span class="pos">72</span> <span class="tx3">/</span> 68</td></tr>
+          <tr><td class="tx2">ISS trend</td><td class="r"><svg class="spark" viewBox="0 0 80 14" width="80" height="14"><path d="M0,10 L10,9 L20,8 L30,7 L40,6 L50,5 L60,5 L70,4 L80,3" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg></td></tr>
+        </tbody>
+      </table>
+
+      <div class="border-t hl px-4 py-3">
+        <div class="kicker mb-2 flex justify-between"><span>Events in window · 5</span><span class="tx3">▾ filter</span></div>
+        <div class="space-y-1.5 mono text-[11px]">
+          <div class="flex items-center gap-2"><span class="acc w-14">22 Apr</span><span class="pill fill-acc acc">52WH</span><span class="tx3 text-[9.5px] ml-auto">+0.0%</span></div>
+          <div class="flex items-center gap-2"><span class="info w-14">14 Mar</span><span class="pill fill-info info">Div ₹16</span><span class="pos text-[9.5px] ml-auto">+1.2%</span></div>
+          <div class="flex items-center gap-2"><span class="evt w-14">12 Feb</span><span class="pill fill-evt evt">L.Order</span><span class="pos text-[9.5px] ml-auto">+4.8%</span></div>
+          <div class="flex items-center gap-2"><span class="info w-14">22 Jan</span><span class="pill fill-info info">Earn</span><span class="pos text-[9.5px] ml-auto">+3.4%</span></div>
+          <div class="flex items-center gap-2"><span class="info w-14">25 Oct</span><span class="pill fill-info info">Earn</span><span class="neg text-[9.5px] ml-auto">−1.1%</span></div>
+        </div>
+      </div>
+
+      <div class="border-t hl px-4 py-3 mt-auto mono text-[10px] tx3 leading-relaxed">
+        Source · <span class="acc">fact_eod_price</span> + <span class="acc">fact_corporate_event</span> + <span class="acc">mart_stock_signals</span> · resampled daily.<br>
+        ↻ click bar → snap §01 calc-date.
+      </div>
+    </div>
+  </div>
+
+  <!-- Sector mode preview strip -->
+  <div class="panel mt-3 px-4 py-3">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <div class="kicker">Quick sector trends · 1M avg return per sector</div>
+        <div class="serif text-[16px] leading-tight">↻ click a sector tile to switch Workbench to Sector mode</div>
+      </div>
+      <span class="tag mono">Mode · Sector</span>
+    </div>
+    <div class="grid gap-2" style="grid-template-columns:repeat(13,minmax(0,1fr))">
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Infra</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,16 L8,15 L16,13 L24,11 L32,8 L40,7 L48,5 L56,3 L60,2" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] pos mt-0.5">+9.2%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Telecom</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,15 L10,14 L20,12 L30,10 L40,8 L50,5 L60,3" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] pos mt-0.5">+6.8%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Metals</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,14 L10,13 L20,12 L30,9 L40,7 L50,6 L60,4" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] pos mt-0.5">+5.1%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Auto</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,13 L10,12 L20,10 L30,9 L40,7 L50,6 L60,5" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] pos mt-0.5">+4.4%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Energy</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,12 L10,11 L20,10 L30,9 L40,8 L50,7 L60,6" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] pos mt-0.5">+3.2%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Utilities</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,12 L10,11 L20,11 L30,10 L40,9 L50,8 L60,7" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] pos mt-0.5">+2.85%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Health</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,11 L10,11 L20,10 L30,11 L40,10 L50,9 L60,9" stroke="#4ADE80" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] pos mt-0.5">+1.4%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Insurance</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,10 L10,11 L20,10 L30,11 L40,11 L50,10 L60,11" stroke="#FBBF24" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] tx2 mt-0.5">+0.4%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Financ.</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,10 L10,11 L20,12 L30,12 L40,11 L50,12 L60,12" stroke="#FBBF24" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] warn mt-0.5">−0.8%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Pharma</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,9 L10,10 L20,11 L30,12 L40,12 L50,13 L60,13" stroke="#F87171" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] neg mt-0.5">−1.9%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Consumer</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,9 L10,10 L20,12 L30,12 L40,13 L50,13 L60,14" stroke="#F87171" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] neg mt-0.5">−2.1%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer">
+        <div class="kicker mb-0.5">Cement</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,8 L10,9 L20,11 L30,12 L40,13 L50,14 L60,14" stroke="#F87171" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] neg mt-0.5">−2.8%</div>
+      </div>
+      <div class="sub p-2 cursor-pointer" style="outline:1px solid var(--neg)">
+        <div class="kicker mb-0.5">IT</div>
+        <svg class="spark" viewBox="0 0 60 18" width="100%" height="18"><path d="M0,7 L10,8 L20,10 L30,12 L40,13 L50,14 L60,15" stroke="#F87171" stroke-width="1.25" fill="none"/></svg>
+        <div class="mono text-[10px] neg mt-0.5">−3.4%</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ §04 MOVERS & EXTREMES ============ -->
+<details class="page" open>
+  <summary>
+    <div class="flex items-baseline gap-3 mb-3">
+      <span class="sec-num">§ 04</span>
+      <span class="kicker">Movers &amp; Extremes</span>
+      <span class="sec-rule"></span>
+      <span class="kicker">10G · 10L</span>
+      <span class="chev">▶</span>
+    </div>
+  </summary>
+
+  <!-- Filter bar -->
+  <div class="panel p-3 flex items-center gap-3 flex-wrap mono text-[11px]">
+    <span class="kicker mr-1">Period</span>
+    <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">1D</span>
+    <span class="tag">1M</span>
+    <span class="tag">3M</span>
+    <span class="tag">1Y</span>
+    <span class="kicker ml-3">Mcap ≥</span>
+    <span class="tag">All</span>
+    <span class="tag">5K Cr</span>
+    <span class="tag">20K Cr</span>
+    <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">1L Cr</span>
+    <span class="kicker ml-3">Sector</span>
+    <span class="tag">multi-select ▾</span>
+    <span class="kicker ml-3">Nifty 50</span>
+    <span class="tag">ON</span>
+    <span class="ml-auto kicker">scanner-pipeline · mart_stock_signals</span>
+  </div>
+
+  <div class="grid grid-cols-12 gap-3 mt-3">
+    <!-- Gainers -->
+    <div class="panel col-span-6">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div class="serif text-[20px] leading-tight">Top 10 Gainers <span class="tx3 text-[14px] mono">· 1D</span></div>
+        <span class="pill fill-pos pos">▲ session</span>
+      </div>
+      <table class="dense">
+        <thead><tr><th>#</th><th>Symbol</th><th>Sector</th><th class="r">Δ %</th><th class="r">Vol Δ</th><th class="r">RS</th><th class="r">↘ 52WH</th><th>Tag</th></tr></thead>
+        <tbody>
+          <tr><td class="tx3">01</td><td class="sym">ADANIENT</td><td class="tx2">Infra</td><td class="r pos">+5.40%</td><td class="r warn">+240%</td><td class="r pos">+4.55</td><td class="r pos">−0.9%</td><td><span class="pill fill-warn warn">Vol Breakout</span></td></tr>
+          <tr><td class="tx3">02</td><td class="sym">TATASTEEL</td><td class="tx2">Metals</td><td class="r pos">+4.20%</td><td class="r warn">+180%</td><td class="r pos">+3.35</td><td class="r tx2">−5.4%</td><td><span class="pill fill-warn warn">Vol Breakout</span></td></tr>
+          <tr><td class="tx3">03</td><td class="sym">TATAMOTORS</td><td class="tx2">Auto</td><td class="r pos">+3.80%</td><td class="r acc">+140%</td><td class="r pos">+2.95</td><td class="r tx2">−3.1%</td><td><span class="pill fill-pos pos">Mom Conf</span></td></tr>
+          <tr><td class="tx3">04</td><td class="sym">HINDALCO</td><td class="tx2">Metals</td><td class="r pos">+3.40%</td><td class="r warn">+85%</td><td class="r pos">+2.55</td><td class="r tx2">−7.2%</td><td><span class="pill fill-info info">Volume-Conf</span></td></tr>
+          <tr><td class="tx3">05</td><td class="sym">ADANIPORTS</td><td class="tx2">Infra</td><td class="r pos">+2.95%</td><td class="r acc">+62%</td><td class="r pos">+2.10</td><td class="r tx2">−4.8%</td><td><span class="pill fill-pos pos">Mom Conf</span></td></tr>
+          <tr><td class="tx3">06</td><td class="sym">JSWSTEEL</td><td class="tx2">Metals</td><td class="r pos">+2.80%</td><td class="r tx2">+40%</td><td class="r pos">+1.95</td><td class="r tx2">−6.1%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">07</td><td class="sym">M&amp;M</td><td class="tx2">Auto</td><td class="r pos">+2.50%</td><td class="r tx2">+28%</td><td class="r pos">+1.65</td><td class="r tx2">−3.6%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">08</td><td class="sym">BHARTIARTL</td><td class="tx2">Telecom</td><td class="r pos">+2.15%</td><td class="r warn">+105%</td><td class="r pos">+1.30</td><td class="r pos">−0.4%</td><td><span class="badge-gold">Triple Conf</span></td></tr>
+          <tr><td class="tx3">09</td><td class="sym">SHRIRAMFIN</td><td class="tx2">Financials</td><td class="r pos">+2.15%</td><td class="r tx2">+22%</td><td class="r pos">+1.30</td><td class="r tx2">−2.0%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">10</td><td class="sym">HEROMOTOCO</td><td class="tx2">Auto</td><td class="r pos">+1.95%</td><td class="r tx2">+18%</td><td class="r pos">+1.10</td><td class="r tx2">−2.4%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Losers -->
+    <div class="panel col-span-6">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div class="serif text-[20px] leading-tight">Top 10 Losers <span class="tx3 text-[14px] mono">· 1D</span></div>
+        <span class="pill fill-neg neg">▼ session</span>
+      </div>
+      <table class="dense">
+        <thead><tr><th>#</th><th>Symbol</th><th>Sector</th><th class="r">Δ %</th><th class="r">Vol Δ</th><th class="r">RS</th><th class="r">↗ 52WL</th><th>Tag</th></tr></thead>
+        <tbody>
+          <tr style="background:rgba(248,113,113,.06)"><td class="tx3">01</td><td class="sym">INDUSINDBK</td><td class="tx2">Financials</td><td class="r neg">−4.20%</td><td class="r warn">+180%</td><td class="r neg">−5.05</td><td class="r neg">+2.4%</td><td><span class="pill fill-neg neg">Selling Climax?</span></td></tr>
+          <tr><td class="tx3">02</td><td class="sym">DIVISLAB</td><td class="tx2">Pharma</td><td class="r neg">−3.50%</td><td class="r tx2">+45%</td><td class="r neg">−4.35</td><td class="r tx2">+8.2%</td><td><span class="pill fill-warn warn">Event Review</span></td></tr>
+          <tr><td class="tx3">03</td><td class="sym">BAJFINANCE</td><td class="tx2">Financials</td><td class="r neg">−3.20%</td><td class="r acc">+72%</td><td class="r neg">−4.05</td><td class="r tx2">+5.8%</td><td><span class="pill fill-info info">Accumulation</span></td></tr>
+          <tr><td class="tx3">04</td><td class="sym">BAJAJFINSV</td><td class="tx2">Financials</td><td class="r neg">−2.85%</td><td class="r tx2">+35%</td><td class="r neg">−3.70</td><td class="r tx2">+6.4%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">05</td><td class="sym">ASIANPAINT</td><td class="tx2">Consumer</td><td class="r neg">−2.40%</td><td class="r tx2">−10%</td><td class="r neg">−3.25</td><td class="r tx2">+7.5%</td><td><span class="pill fill-info info">Accumulation</span></td></tr>
+          <tr><td class="tx3">06</td><td class="sym">DRREDDY</td><td class="tx2">Pharma</td><td class="r neg">−2.10%</td><td class="r tx2">+18%</td><td class="r neg">−2.95</td><td class="r tx2">+11.2%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">07</td><td class="sym">LTIM</td><td class="tx2">IT</td><td class="r neg">−1.95%</td><td class="r tx2">+15%</td><td class="r neg">−2.80</td><td class="r tx2">+4.6%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">08</td><td class="sym">ULTRACEMCO</td><td class="tx2">Cement</td><td class="r neg">−1.85%</td><td class="r tx2">+8%</td><td class="r neg">−2.70</td><td class="r tx2">+3.8%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">09</td><td class="sym">BRITANNIA</td><td class="tx2">Consumer</td><td class="r neg">−1.80%</td><td class="r tx2">−5%</td><td class="r neg">−2.65</td><td class="r tx2">+2.1%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+          <tr><td class="tx3">10</td><td class="sym">TECHM</td><td class="tx2">IT</td><td class="r neg">−1.45%</td><td class="r tx2">+12%</td><td class="r neg">−2.30</td><td class="r tx2">+5.4%</td><td><span class="pill fill-mute tx2">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Scatter -->
+  <div class="panel mt-3">
+    <div class="px-4 py-3 border-b hl flex items-center justify-between">
+      <div>
+        <div class="kicker">2.4 · Return × Volume Scatter</div>
+        <div class="serif text-[20px] leading-tight">Quadrant view — volume-confirmed moves</div>
+      </div>
+      <div class="mono text-[10px] tx3">●&nbsp;size = mcap &nbsp; · &nbsp; ●&nbsp;color = sector &nbsp; · &nbsp; ◊&nbsp;gold border = vol&nbsp;&gt;&nbsp;100% &amp; ret&nbsp;&gt;&nbsp;0</div>
+    </div>
+    <div class="p-4">
+      <svg viewBox="0 0 800 220" class="w-full" style="height:220px">
+        <!-- grid -->
+        <line x1="400" y1="0" x2="400" y2="220" stroke="#26262C" stroke-dasharray="3 4"/>
+        <line x1="0" y1="110" x2="800" y2="110" stroke="#26262C" stroke-dasharray="3 4"/>
+        <!-- quadrant labels -->
+        <text x="600" y="20" font-family="JetBrains Mono" font-size="9" fill="#57575E">VOL-CONFIRMED ▲▲</text>
+        <text x="20" y="20" font-family="JetBrains Mono" font-size="9" fill="#57575E">SELLING PRESSURE ▼▲</text>
+        <text x="600" y="210" font-family="JetBrains Mono" font-size="9" fill="#57575E">QUIET DRIFT UP ▲▼</text>
+        <text x="20" y="210" font-family="JetBrains Mono" font-size="9" fill="#57575E">QUIET DRIFT DN ▼▼</text>
+        <text x="402" y="218" font-family="JetBrains Mono" font-size="9" fill="#57575E">return %</text>
+        <text x="2" y="112" font-family="JetBrains Mono" font-size="9" fill="#57575E">vol Δ %</text>
+
+        <!-- dots -->
+        <!-- top-right -->
+        <circle cx="690" cy="20" r="11" fill="#A78BFA" stroke="#F4A340" stroke-width="2" opacity=".9"/>
+        <text x="704" y="22" font-family="JetBrains Mono" font-size="9" fill="#F4F4F0">ADANIENT</text>
+        <circle cx="640" cy="40" r="9" fill="#60A5FA" stroke="#F4A340" stroke-width="2"/>
+        <text x="652" y="42" font-family="JetBrains Mono" font-size="9" fill="#F4F4F0">TATASTEEL</text>
+        <circle cx="580" cy="60" r="8" fill="#FBBF24" opacity=".85"/>
+        <circle cx="555" cy="78" r="9" fill="#4ADE80" opacity=".85"/>
+        <circle cx="530" cy="68" r="7" fill="#60A5FA" opacity=".85"/>
+        <circle cx="495" cy="88" r="6" fill="#FBBF24" opacity=".85"/>
+        <circle cx="470" cy="80" r="6" fill="#A78BFA" opacity=".85"/>
+        <!-- bottom-right -->
+        <circle cx="510" cy="148" r="14" fill="#4ADE80" opacity=".7"/>
+        <text x="525" y="150" font-family="JetBrains Mono" font-size="9" fill="#8B8B92">RELIANCE</text>
+        <circle cx="455" cy="138" r="8" fill="#60A5FA" opacity=".7"/>
+        <circle cx="430" cy="160" r="6" fill="#A78BFA" opacity=".7"/>
+        <circle cx="425" cy="125" r="9" fill="#FBBF24" opacity=".7"/>
+        <!-- bottom-left -->
+        <circle cx="280" cy="135" r="11" fill="#F87171" opacity=".7"/>
+        <circle cx="240" cy="155" r="9" fill="#FBBF24" opacity=".7"/>
+        <circle cx="215" cy="170" r="7" fill="#A78BFA" opacity=".7"/>
+        <circle cx="195" cy="142" r="9" fill="#F87171" opacity=".7"/>
+        <!-- top-left -->
+        <circle cx="225" cy="65" r="13" fill="#F87171"/>
+        <text x="200" y="55" font-family="JetBrains Mono" font-size="9" fill="#F87171">INDUSINDBK</text>
+        <circle cx="265" cy="85" r="8" fill="#A78BFA"/>
+        <text x="240" y="100" font-family="JetBrains Mono" font-size="9" fill="#F4F4F0">DIVISLAB</text>
+        <circle cx="305" cy="92" r="9" fill="#F87171"/>
+        <circle cx="335" cy="78" r="6" fill="#FBBF24"/>
+      </svg>
+    </div>
+  </div>
+</details>
+
+<!-- ============ §05 DRAWDOWN SCANNER ============ -->
+<details class="page" open>
+  <summary>
+    <div class="flex items-baseline gap-3 mb-3">
+      <span class="sec-num">§ 05</span>
+      <span class="kicker">Drawdown Scanner</span>
+      <span class="sec-rule"></span>
+      <span class="kicker">≥ 20% · 4 names</span>
+      <span class="chev">▶</span>
+    </div>
+  </summary>
+
+  <!-- Filters + KPIs -->
+  <div class="grid grid-cols-12 gap-3">
+    <div class="panel col-span-8 p-3 flex items-center gap-3 flex-wrap mono text-[11px]">
+      <span class="kicker">Threshold</span>
+      <span class="tag">−10%</span>
+      <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">−20%</span>
+      <span class="tag">−30%</span>
+      <span class="tag">−50%</span>
+      <span class="kicker ml-3">Period</span>
+      <span class="tag">3M</span>
+      <span class="tag">1Y</span>
+      <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">Either</span>
+      <span class="kicker ml-3">Sector</span>
+      <span class="tag">multi ▾</span>
+      <span class="kicker ml-3">Mcap</span>
+      <span class="tag">All</span>
+    </div>
+
+    <div class="panel col-span-4 p-3 grid grid-cols-3 gap-3">
+      <div>
+        <div class="kicker">3M &lt; −20%</div>
+        <div class="serif text-[28px] leading-none neg">2</div>
+      </div>
+      <div>
+        <div class="kicker">1Y &lt; −20%</div>
+        <div class="serif text-[28px] leading-none neg">3</div>
+      </div>
+      <div>
+        <div class="kicker">Avg DD 52WH</div>
+        <div class="serif text-[28px] leading-none warn">−10.4%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drawdown table -->
+  <div class="panel mt-3">
+    <table class="dense">
+      <thead><tr>
+        <th>Symbol</th><th>Company · Sector</th>
+        <th class="r">Px ₹</th><th class="r">3M</th><th class="r">1Y</th>
+        <th class="r">↘ 52WH</th><th class="r">Fwd P/E</th><th class="r">Div Yield</th>
+        <th>Vol trend</th><th>Signal</th><th>Sparkline (1Y)</th>
+      </tr></thead>
+      <tbody>
+        <tr style="background:rgba(248,113,113,.07)" class="evt-stripe">
+          <td class="sym">INDUSINDBK</td><td class="tx2">IndusInd Bank · Financials</td>
+          <td class="r">985.40</td><td class="r neg">−18.4%</td><td class="r neg">−22.5%</td>
+          <td class="r neg">−38.4%</td><td class="r">11.2 <span class="tag" style="font-size:8.5px">MC</span></td><td class="r tx2">0.8%</td>
+          <td><span class="pill fill-neg neg">Rising</span></td>
+          <td><span class="pill fill-neg neg">Falling Knife</span> <span class="pill fill-warn warn">Near 52WL</span></td>
+          <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,4 L15,6 L30,3 L45,8 L60,12 L75,10 L90,16 L105,18 L120,20 L130,21" stroke="#F87171"/></svg></td>
+        </tr>
+        <tr>
+          <td class="sym">BAJFINANCE</td><td class="tx2">Bajaj Finance · Financials</td>
+          <td class="r">6,982.10</td><td class="r neg">−15.2%</td><td class="r neg">−15.2%</td>
+          <td class="r neg">−28.6%</td><td class="r">22.8 <span class="tag" style="font-size:8.5px">MC</span></td><td class="r tx2">0.4%</td>
+          <td><span class="pill fill-pos pos">Falling</span></td>
+          <td><span class="pill fill-info info">Accumulation</span></td>
+          <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,4 L20,8 L40,12 L60,10 L80,14 L100,16 L120,15 L130,14" stroke="#FBBF24"/></svg></td>
+        </tr>
+        <tr>
+          <td class="sym">ASIANPAINT</td><td class="tx2">Asian Paints · Consumer</td>
+          <td class="r">2,854.10</td><td class="r neg">−12.8%</td><td class="r neg">−18.4%</td>
+          <td class="r neg">−24.2%</td><td class="r">38.5 <span class="tag" style="font-size:8.5px">MC</span></td><td class="r tx2">1.2%</td>
+          <td><span class="pill fill-pos pos">Falling</span></td>
+          <td><span class="pill fill-info info">Accumulation</span></td>
+          <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,2 L18,5 L34,9 L50,8 L68,12 L84,14 L102,13 L120,15 L130,14" stroke="#FBBF24"/></svg></td>
+        </tr>
+        <tr style="background:rgba(244,163,64,.05)" class="evt-stripe-acc">
+          <td class="sym">DIVISLAB</td><td class="tx2">Divi's Laboratories · Pharma</td>
+          <td class="r">4,658.20</td><td class="r neg">−8.6%</td><td class="r neg">−8.6%</td>
+          <td class="r neg">−22.8%</td><td class="r">42.1 <span class="tag" style="font-size:8.5px">MC</span></td><td class="r tx2">0.6%</td>
+          <td><span class="pill fill-warn warn">Mixed</span></td>
+          <td><span class="pill fill-warn warn">Needs Event Review</span></td>
+          <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,3 L20,6 L40,5 L58,9 L78,12 L98,10 L118,13 L130,12" stroke="#FBBF24"/></svg></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
+<!-- ============ §06 BREAKOUT / MOMENTUM ============ -->
+<details class="page" open>
+  <summary>
+    <div class="flex items-baseline gap-3 mb-3">
+      <span class="sec-num">§ 06</span>
+      <span class="kicker">Breakout &amp; Momentum Monitor</span>
+      <span class="sec-rule"></span>
+      <span class="kicker">3M &gt; 20% · 5 names</span>
+      <span class="chev">▶</span>
+    </div>
+  </summary>
+
+  <div class="panel p-3 flex items-center gap-3 flex-wrap mono text-[11px]">
+    <span class="kicker">Period</span>
+    <span class="tag">1M</span>
+    <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">3M</span>
+    <span class="tag">1Y</span>
+    <span class="kicker ml-3">Threshold</span>
+    <span class="tag">&gt; 10%</span>
+    <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">&gt; 20%</span>
+    <span class="tag">&gt; 30%</span>
+    <span class="kicker ml-3">Volume Confirmation</span>
+    <span class="tag">ON</span>
+    <span class="kicker ml-3">Min ISS</span>
+    <span class="tag">50</span>
+    <span class="ml-auto kicker">slider 0…100</span>
+  </div>
+
+  <div class="grid grid-cols-12 gap-3 mt-3">
+    <!-- Momentum table -->
+    <div class="panel col-span-8">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div class="serif text-[20px] leading-tight">Breakout / Momentum Table</div>
+        <span class="mono text-[10px] tx3">5 names · sorted by 3M return</span>
+      </div>
+      <table class="dense">
+        <thead><tr>
+          <th>Symbol</th><th>Sector</th>
+          <th class="r">Mcap</th><th class="r">3M</th>
+          <th class="c">Vol Exp</th><th class="c">Earn Surp</th><th class="c">+ Event</th>
+          <th>Quality Tag</th>
+        </tr></thead>
+        <tbody>
+          <tr style="background:rgba(167,139,250,.05)" class="evt-stripe-info">
+            <td class="sym">ADANIENT</td><td class="tx2">Infra</td>
+            <td class="r">3,28,640</td><td class="r pos">+42.5%</td>
+            <td class="c pos">●</td><td class="c tx3">○</td><td class="c pos">●</td>
+            <td><span class="pill fill-evt evt">Event-Driven Pop</span></td>
+          </tr>
+          <tr>
+            <td class="sym">TATAMOTORS</td><td class="tx2">Auto</td>
+            <td class="r">3,12,560</td><td class="r pos">+28.4%</td>
+            <td class="c pos">●</td><td class="c pos">●</td><td class="c tx3">○</td>
+            <td><span class="pill fill-pos pos">Volume-Confirmed Trend</span></td>
+          </tr>
+          <tr>
+            <td class="sym">TATASTEEL</td><td class="tx2">Metals</td>
+            <td class="r">1,86,200</td><td class="r pos">+24.6%</td>
+            <td class="c pos">●</td><td class="c tx3">○</td><td class="c tx3">○</td>
+            <td><span class="pill fill-pos pos">Volume-Confirmed Trend</span></td>
+          </tr>
+          <tr style="background:rgba(244,163,64,.05)">
+            <td class="sym">BHARTIARTL</td><td class="tx2">Telecom</td>
+            <td class="r">8,65,420</td><td class="r pos">+22.8%</td>
+            <td class="c pos">●</td><td class="c pos">●</td><td class="c pos">●</td>
+            <td><span class="badge-gold">Triple Confirmation</span></td>
+          </tr>
+          <tr>
+            <td class="sym">HINDALCO</td><td class="tx2">Metals</td>
+            <td class="r">1,47,860</td><td class="r pos">+21.5%</td>
+            <td class="c tx3">○</td><td class="c tx3">○</td><td class="c tx3">○</td>
+            <td><span class="pill fill-warn warn">Thin Volume Breakout</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top 15 Momentum bar chart -->
+    <div class="panel col-span-4">
+      <div class="px-4 py-3 border-b hl">
+        <div class="serif text-[20px] leading-tight">Top 15 by 3M Return</div>
+        <div class="kicker">color = quality tag</div>
+      </div>
+      <div class="p-4 space-y-1.5">
+        <!-- bar row helper -->
+        <div class="flex items-center gap-2 text-[11px] mono">
+          <span class="w-20 tx2">ADANIENT</span><span class="w-12 r text-right">+42.5%</span>
+          <div class="bar grow"><i style="width:96%;background:var(--evt)"></i></div>
+          <span class="acc">★</span>
+        </div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">TATAMOTORS</span><span class="w-12 r text-right">+28.4%</span>
+          <div class="bar grow"><i style="width:64%;background:var(--pos)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">TATASTEEL</span><span class="w-12 r text-right">+24.6%</span>
+          <div class="bar grow"><i style="width:56%;background:var(--pos)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">BHARTIARTL</span><span class="w-12 r text-right">+22.8%</span>
+          <div class="bar grow"><i style="width:51%;background:var(--acc)"></i></div><span class="acc">★</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">HINDALCO</span><span class="w-12 r text-right">+21.5%</span>
+          <div class="bar grow"><i style="width:48%;background:var(--warn)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">ADANIPORTS</span><span class="w-12 r text-right">+19.3%</span>
+          <div class="bar grow"><i style="width:44%;background:var(--pos)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">M&amp;M</span><span class="w-12 r text-right">+18.6%</span>
+          <div class="bar grow"><i style="width:42%;background:var(--pos)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">JSWSTEEL</span><span class="w-12 r text-right">+17.2%</span>
+          <div class="bar grow"><i style="width:39%;background:var(--pos)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">RELIANCE</span><span class="w-12 r text-right">+15.4%</span>
+          <div class="bar grow"><i style="width:35%;background:var(--pos)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">SHRIRAMFIN</span><span class="w-12 r text-right">+14.8%</span>
+          <div class="bar grow"><i style="width:33%;background:var(--pos)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">NTPC</span><span class="w-12 r text-right">+12.9%</span>
+          <div class="bar grow"><i style="width:29%;background:var(--info)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">HEROMOTOCO</span><span class="w-12 r text-right">+11.5%</span>
+          <div class="bar grow"><i style="width:26%;background:var(--info)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">EICHERMOT</span><span class="w-12 r text-right">+10.8%</span>
+          <div class="bar grow"><i style="width:24%;background:var(--info)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">BAJAJ-AUTO</span><span class="w-12 r text-right">+9.6%</span>
+          <div class="bar grow"><i style="width:22%;background:var(--info)"></i></div><span class="tx3">·</span></div>
+        <div class="flex items-center gap-2 text-[11px] mono"><span class="w-20 tx2">SBIN</span><span class="w-12 r text-right">+8.2%</span>
+          <div class="bar grow"><i style="width:18%;background:var(--info)"></i></div><span class="tx3">·</span></div>
+      </div>
+      <div class="px-4 py-2 border-t hl mono text-[10px] tx3">★ ≥ 50% (none today) · ● tag color: green=Vol-Conf · purple=Event · amber=Thin · orange=Squeeze</div>
+    </div>
+  </div>
+</details>
+
+<!-- ============ §07 VOLUME ANOMALY ============ -->
+<details class="page" open>
+  <summary>
+    <div class="flex items-baseline gap-3 mb-3">
+      <span class="sec-num">§ 07</span>
+      <span class="kicker">Volume Anomaly Monitor</span>
+      <span class="sec-rule"></span>
+      <span class="kicker">3 spike tiers · 50-cell heatmap</span>
+      <span class="chev">▶</span>
+    </div>
+  </summary>
+
+  <!-- Three spike panels -->
+  <div class="grid grid-cols-12 gap-3">
+
+    <div class="panel col-span-4">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div class="serif text-[18px] leading-tight">Vol &gt; 1.2× <span class="tx3 text-[11px]">moderate</span></div>
+        <span class="pill fill-warn warn">A</span>
+      </div>
+      <table class="dense">
+        <thead><tr><th>Sym</th><th class="r">Ratio</th><th class="r">Δ Px</th><th class="r">Deliv%</th><th>Event</th></tr></thead>
+        <tbody>
+          <tr><td class="sym">M&amp;M</td><td class="r warn">1.28×</td><td class="r pos">+2.50%</td><td class="r tx2">62%</td><td><span class="tag">—</span></td></tr>
+          <tr><td class="sym">SHRIRAMFIN</td><td class="r warn">1.22×</td><td class="r pos">+2.15%</td><td class="r tx2">58%</td><td><span class="tag">—</span></td></tr>
+          <tr><td class="sym">JSWSTEEL</td><td class="r warn">1.40×</td><td class="r pos">+2.80%</td><td class="r tx2">71%</td><td><span class="tag">—</span></td></tr>
+          <tr><td class="sym">HINDALCO</td><td class="r warn">1.42×</td><td class="r pos">+3.40%</td><td class="r tx2">67%</td><td><span class="tag">—</span></td></tr>
+          <tr><td class="sym">RELIANCE</td><td class="r warn">1.25×</td><td class="r pos">+1.20%</td><td class="r tx2">55%</td><td><span class="tag" style="color:var(--info);border-color:var(--info)">Earn +2d</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel col-span-4">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div class="serif text-[18px] leading-tight">Vol &gt; 1.5× <span class="tx3 text-[11px]">elevated</span></div>
+        <span class="pill fill-acc acc">B</span>
+      </div>
+      <table class="dense">
+        <thead><tr><th>Sym</th><th class="r">Ratio</th><th class="r">Δ Px</th><th class="r">Deliv%</th><th>Event</th></tr></thead>
+        <tbody>
+          <tr><td class="sym">BAJFINANCE</td><td class="r acc">1.72×</td><td class="r neg">−3.20%</td><td class="r tx2">48%</td><td><span class="tag">—</span></td></tr>
+          <tr><td class="sym">BHARTIARTL</td><td class="r acc">1.65×</td><td class="r pos">+2.15%</td><td class="r pos">76%</td><td><span class="tag" style="color:var(--info);border-color:var(--info)">Earn -8d</span></td></tr>
+          <tr><td class="sym">TATASTEEL</td><td class="r acc">1.83×</td><td class="r pos">+4.20%</td><td class="r tx2">69%</td><td><span class="tag">—</span></td></tr>
+          <tr><td class="sym">ADANIPORTS</td><td class="r acc">1.62×</td><td class="r pos">+2.95%</td><td class="r tx2">65%</td><td><span class="tag">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel col-span-4">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div class="serif text-[18px] leading-tight">Vol &gt; 2× <span class="tx3 text-[11px]">extreme</span></div>
+        <span class="pill fill-neg neg">C</span>
+      </div>
+      <table class="dense">
+        <thead><tr><th>Sym</th><th class="r">Ratio</th><th class="r">Δ Px</th><th class="r">Deliv%</th><th>Event</th></tr></thead>
+        <tbody>
+          <tr style="background:rgba(244,163,64,.06)"><td class="sym">ADANIENT</td><td class="r neg">3.42×</td><td class="r pos">+5.40%</td><td class="r pos">82%</td><td><span class="tag" style="color:var(--evt);border-color:var(--evt)">L.Order 0d</span></td></tr>
+          <tr style="background:rgba(248,113,113,.07)"><td class="sym">INDUSINDBK</td><td class="r neg">2.84×</td><td class="r neg">−4.20%</td><td class="r tx2">52%</td><td><span class="tag" style="color:var(--neg);border-color:var(--neg)">Reg -2d</span></td></tr>
+          <tr><td class="sym">TATAMOTORS</td><td class="r neg">2.42×</td><td class="r pos">+3.80%</td><td class="r pos">74%</td><td><span class="tag">—</span></td></tr>
+          <tr><td class="sym">DIVISLAB</td><td class="r neg">2.18×</td><td class="r neg">−3.50%</td><td class="r tx2">44%</td><td><span class="tag" style="color:var(--evt);border-color:var(--evt)">Earn +8d</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Contraction + heatmap -->
+  <div class="grid grid-cols-12 gap-3 mt-3">
+    <!-- Contraction -->
+    <div class="panel col-span-5">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div>
+          <div class="kicker">5.2 · Volume Contraction</div>
+          <div class="serif text-[18px] leading-tight">Below-average activity</div>
+        </div>
+        <div class="flex gap-1.5 mono text-[10px]">
+          <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">&lt; 0.8×</span>
+          <span class="tag">&lt; 0.5×</span>
+        </div>
+      </div>
+      <table class="dense">
+        <thead><tr><th>Sym</th><th>Sector</th><th class="r">Ratio</th><th class="r">Δ Px</th><th>Tag</th></tr></thead>
+        <tbody>
+          <tr><td class="sym">HCLTECH</td><td class="tx2">IT</td><td class="r tx2">0.74×</td><td class="r neg">−0.55%</td><td><span class="tag" style="color:var(--tx2)">Low conviction</span></td></tr>
+          <tr><td class="sym">WIPRO</td><td class="tx2">IT</td><td class="r tx2">0.68×</td><td class="r neg">−1.20%</td><td><span class="tag" style="color:var(--warn);border-color:var(--warn)">Illiquid Sell</span></td></tr>
+          <tr><td class="sym">TECHM</td><td class="tx2">IT</td><td class="r tx2">0.64×</td><td class="r neg">−1.45%</td><td><span class="tag" style="color:var(--warn);border-color:var(--warn)">Illiquid Sell</span></td></tr>
+          <tr><td class="sym">NESTLEIND</td><td class="tx2">Consumer</td><td class="r tx2">0.78×</td><td class="r neg">−0.95%</td><td><span class="tag" style="color:var(--tx2)">Low conviction</span></td></tr>
+          <tr><td class="sym">CIPLA</td><td class="tx2">Pharma</td><td class="r tx2">0.71×</td><td class="r neg">−0.75%</td><td><span class="tag" style="color:var(--tx2)">Low conviction</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Heatmap grid -->
+    <div class="panel col-span-7">
+      <div class="px-4 py-3 border-b hl flex items-center justify-between">
+        <div>
+          <div class="kicker">5.3 · Vol Ratio Heatmap · 50 cells</div>
+          <div class="serif text-[18px] leading-tight">Today vs 20-Day Avg</div>
+        </div>
+        <div class="flex items-center gap-1.5 mono text-[10px]">
+          <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">A→Z</span>
+          <span class="tag">By Sector</span>
+        </div>
+      </div>
+      <div class="p-3">
+        <div class="vh">
+          <!-- Row 1 -->
+          <div class="vh-cell" style="background:#5A1A1F;color:#fff"><span class="vh-sym">ADANIENT</span><span class="vh-ratio">3.42×</span></div>
+          <div class="vh-cell" style="background:#7A2228;color:#fff"><span class="vh-sym">INDUSINDBK</span><span class="vh-ratio">2.84×</span></div>
+          <div class="vh-cell" style="background:#9A2D2D;color:#fff"><span class="vh-sym">TATAMOTORS</span><span class="vh-ratio">2.42×</span></div>
+          <div class="vh-cell" style="background:#9A2D2D;color:#fff"><span class="vh-sym">DIVISLAB</span><span class="vh-ratio">2.18×</span></div>
+          <div class="vh-cell" style="background:#B23E33;color:#fff"><span class="vh-sym">TATASTEEL</span><span class="vh-ratio">1.83×</span></div>
+          <div class="vh-cell" style="background:#B23E33;color:#fff"><span class="vh-sym">BAJFINANCE</span><span class="vh-ratio">1.72×</span></div>
+          <div class="vh-cell" style="background:#B23E33;color:#fff"><span class="vh-sym">BHARTIARTL</span><span class="vh-ratio">1.65×</span></div>
+          <div class="vh-cell" style="background:#B23E33;color:#fff"><span class="vh-sym">ADANIPORTS</span><span class="vh-ratio">1.62×</span></div>
+          <div class="vh-cell" style="background:#7C5316;color:#fff"><span class="vh-sym">HINDALCO</span><span class="vh-ratio">1.42×</span></div>
+          <div class="vh-cell" style="background:#7C5316;color:#fff"><span class="vh-sym">JSWSTEEL</span><span class="vh-ratio">1.40×</span></div>
+          <!-- Row 2 -->
+          <div class="vh-cell" style="background:#7C5316;color:#fff"><span class="vh-sym">M&amp;M</span><span class="vh-ratio">1.28×</span></div>
+          <div class="vh-cell" style="background:#7C5316;color:#fff"><span class="vh-sym">RELIANCE</span><span class="vh-ratio">1.25×</span></div>
+          <div class="vh-cell" style="background:#7C5316;color:#fff"><span class="vh-sym">SHRIRAMFIN</span><span class="vh-ratio">1.22×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">ONGC</span><span class="vh-ratio">1.18×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">EICHERMOT</span><span class="vh-ratio">1.14×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">HEROMOTOCO</span><span class="vh-ratio">1.10×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">BAJAJ-AUTO</span><span class="vh-ratio">1.08×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">SBIN</span><span class="vh-ratio">1.06×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">ICICIBANK</span><span class="vh-ratio">1.04×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">NTPC</span><span class="vh-ratio">1.02×</span></div>
+          <!-- Row 3 -->
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">POWERGRID</span><span class="vh-ratio">1.00×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">SUNPHARMA</span><span class="vh-ratio">0.98×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">AXISBANK</span><span class="vh-ratio">0.95×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">HDFCBANK</span><span class="vh-ratio">0.94×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">KOTAKBANK</span><span class="vh-ratio">0.91×</span></div>
+          <div class="vh-cell" style="background:#3D3D40"><span class="vh-sym">TITAN</span><span class="vh-ratio">0.90×</span></div>
+          <div class="vh-cell" style="background:#2C2C30"><span class="vh-sym">BAJAJFINSV</span><span class="vh-ratio">0.88×</span></div>
+          <div class="vh-cell" style="background:#2C2C30"><span class="vh-sym">SBILIFE</span><span class="vh-ratio">0.86×</span></div>
+          <div class="vh-cell" style="background:#2C2C30"><span class="vh-sym">COALINDIA</span><span class="vh-ratio">0.84×</span></div>
+          <div class="vh-cell" style="background:#2C2C30"><span class="vh-sym">GRASIM</span><span class="vh-ratio">0.83×</span></div>
+          <!-- Row 4 -->
+          <div class="vh-cell" style="background:#2C2C30"><span class="vh-sym">APOLLOHOSP</span><span class="vh-ratio">0.82×</span></div>
+          <div class="vh-cell" style="background:#2C2C30"><span class="vh-sym">BPCL</span><span class="vh-ratio">0.81×</span></div>
+          <div class="vh-cell" style="background:#2C2C30"><span class="vh-sym">ULTRACEM</span><span class="vh-ratio">0.80×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">NESTLEIND</span><span class="vh-ratio">0.78×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">MARUTI</span><span class="vh-ratio">0.77×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">HDFCLIFE</span><span class="vh-ratio">0.76×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">DRREDDY</span><span class="vh-ratio">0.75×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">HCLTECH</span><span class="vh-ratio">0.74×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">BRITANNIA</span><span class="vh-ratio">0.73×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">CIPLA</span><span class="vh-ratio">0.71×</span></div>
+          <!-- Row 5 -->
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">WIPRO</span><span class="vh-ratio">0.68×</span></div>
+          <div class="vh-cell" style="background:#1F1F22"><span class="vh-sym">TECHM</span><span class="vh-ratio">0.64×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">ASIANPAINT</span><span class="vh-ratio">0.61×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">HINDUNILVR</span><span class="vh-ratio">0.58×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">TCS</span><span class="vh-ratio">0.55×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">INFY</span><span class="vh-ratio">0.54×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">LTIM</span><span class="vh-ratio">0.52×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">ITC</span><span class="vh-ratio">0.50×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">TATACONSUM</span><span class="vh-ratio">0.48×</span></div>
+          <div class="vh-cell" style="background:#141417"><span class="vh-sym">LT</span><span class="vh-ratio">0.46×</span></div>
+        </div>
+        <div class="flex items-center justify-between mt-3 mono text-[10px] tx3">
+          <div class="flex items-center gap-1.5">
+            <span>0.5×</span>
+            <span class="inline-block w-5 h-3" style="background:#141417"></span>
+            <span class="inline-block w-5 h-3" style="background:#1F1F22"></span>
+            <span class="inline-block w-5 h-3" style="background:#3D3D40"></span>
+            <span class="inline-block w-5 h-3" style="background:#7C5316"></span>
+            <span class="inline-block w-5 h-3" style="background:#B23E33"></span>
+            <span class="inline-block w-5 h-3" style="background:#5A1A1F"></span>
+            <span>3×+</span>
+          </div>
+          <div>↻ pulse on cells &gt; 3× (mock)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Education sidebar -->
+  <details class="panel mt-3">
+    <summary class="px-4 py-3 flex items-center justify-between cursor-pointer">
+      <span class="serif text-[16px]">Why abnormal volume matters</span>
+      <span class="chev acc">▶</span>
+    </summary>
+    <div class="px-4 pb-4 mono text-[11px] leading-relaxed tx2 grid grid-cols-2 gap-x-8">
+      <p>1. Volume spikes often <em class="not-italic acc">precede</em> corporate announcements — institutional positioning before scheduled events leaves footprints before price moves.</p>
+      <p>2. <em class="not-italic acc">High-volume declines</em> suggest distribution by large holders; <em class="not-italic acc">high-volume recoveries</em> suggest re-accumulation — both are more structurally significant than low-volume moves.</p>
+      <p>3. <em class="not-italic acc">Persistent contraction</em> on a declining stock may indicate forced selling exhaustion — a potential setup for stabilization.</p>
+      <p>4. <em class="not-italic acc">Delivery %</em> alongside volume ratio distinguishes speculative intraday surges (low delivery) from genuine institutional interest (high delivery), sharpening signal quality.</p>
+    </div>
+  </details>
+</details>
+
+<!-- ============ §08 CORPORATE EVENTS ============ -->
+<details class="page" open>
+  <summary>
+    <div class="flex items-baseline gap-3 mb-3">
+      <span class="sec-num">§ 08</span>
+      <span class="kicker">Corporate Events Tracker</span>
+      <span class="sec-rule"></span>
+      <span class="kicker">last 7d · next 7d</span>
+      <span class="chev">▶</span>
+    </div>
+  </summary>
+
+  <div class="panel p-3 flex items-center gap-3 flex-wrap mono text-[11px]">
+    <span class="kicker">Range</span>
+    <span class="tag">Last 7D</span>
+    <span class="tag" style="background:var(--acc);color:var(--bg);border-color:var(--acc)">Last 30D</span>
+    <span class="tag">Next 7D</span>
+    <span class="tag">Next 30D</span>
+    <span class="tag">Custom</span>
+    <span class="kicker ml-3">Type</span>
+    <span class="tag" style="color:var(--info);border-color:var(--info)">Earnings</span>
+    <span class="tag" style="color:var(--pos);border-color:var(--pos)">Dividend</span>
+    <span class="tag">Bonus</span>
+    <span class="tag">Split</span>
+    <span class="tag">Buyback</span>
+    <span class="tag">Rights</span>
+    <span class="tag" style="color:var(--warn);border-color:var(--warn)">Leader Δ</span>
+    <span class="tag" style="color:var(--evt);border-color:var(--evt)">M&amp;A</span>
+    <span class="tag" style="color:var(--neg);border-color:var(--neg)">Regulatory</span>
+    <span class="kicker ml-3">Sig ≥</span>
+    <span class="tag">3</span>
+    <span class="kicker ml-3">Follow-up</span>
+    <span class="tag">ON</span>
+  </div>
+
+  <div class="panel mt-3">
+    <table class="dense">
+      <thead><tr>
+        <th>Date</th><th>Symbol</th><th>Sector</th>
+        <th>Type</th><th>Summary</th>
+        <th class="r">+1D</th><th class="r">+5D</th><th class="r">+20D</th>
+        <th class="c">Vol↑</th><th class="c">Sig</th><th class="c">Follow</th>
+        <th>± 10d Sparkline</th>
+      </tr></thead>
+      <tbody>
+
+      <!-- upcoming -->
+      <tr style="background:rgba(96,165,250,.05)" class="evt-stripe-info">
+        <td class="mono">2026-05-12</td><td class="sym">RELIANCE</td><td class="tx2">Energy</td>
+        <td><span class="pill fill-info info">Earnings</span></td>
+        <td class="tx2">Q4 FY26 results · expected post-market</td>
+        <td class="r tx3">—</td><td class="r tx3">—</td><td class="r tx3">—</td>
+        <td class="c tx3">—</td><td class="c"><span class="acc">★★★</span><span class="tx3">★★</span></td><td class="c pos">●</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,12 L20,10 L40,11 L60,8 L80,9" stroke="#60A5FA"/><line x1="80" y1="0" x2="80" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      <tr style="background:rgba(96,165,250,.05)" class="evt-stripe-info">
+        <td class="mono">2026-05-13</td><td class="sym">TCS</td><td class="tx2">IT</td>
+        <td><span class="pill fill-pos pos">Dividend</span></td>
+        <td class="tx2">Final dividend ₹73/share · ex-date</td>
+        <td class="r tx3">—</td><td class="r tx3">—</td><td class="r tx3">—</td>
+        <td class="c tx3">—</td><td class="c"><span class="acc">★</span><span class="tx3">★★★★</span></td><td class="c tx3">○</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,8 L20,12 L40,11 L60,14 L80,15" stroke="#F87171"/><line x1="80" y1="0" x2="80" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      <tr style="background:rgba(96,165,250,.05)">
+        <td class="mono">2026-05-15</td><td class="sym">HDFCBANK</td><td class="tx2">Financials</td>
+        <td><span class="pill fill-mute tx2">AGM</span></td>
+        <td class="tx2">Annual General Meeting</td>
+        <td class="r tx3">—</td><td class="r tx3">—</td><td class="r tx3">—</td>
+        <td class="c tx3">—</td><td class="c"><span class="acc">★★</span><span class="tx3">★★★</span></td><td class="c tx3">○</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,12 L20,10 L40,11 L60,9 L80,10" stroke="#8B8B92"/><line x1="80" y1="0" x2="80" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      <tr style="background:rgba(96,165,250,.05)" class="evt-stripe-info">
+        <td class="mono">2026-05-18</td><td class="sym">INFY</td><td class="tx2">IT</td>
+        <td><span class="pill fill-info info">Earnings</span></td>
+        <td class="tx2">Q4 FY26 results · post-market</td>
+        <td class="r tx3">—</td><td class="r tx3">—</td><td class="r tx3">—</td>
+        <td class="c tx3">—</td><td class="c"><span class="acc">★★</span><span class="tx3">★★★</span></td><td class="c tx3">○</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,8 L20,11 L40,12 L60,14 L80,13" stroke="#F87171"/><line x1="80" y1="0" x2="80" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+
+      <!-- past -->
+      <tr style="background:rgba(248,113,113,.07)" class="evt-stripe">
+        <td class="mono">2026-05-08</td><td class="sym">INDUSINDBK</td><td class="tx2">Financials</td>
+        <td><span class="pill fill-neg neg">Regulatory</span></td>
+        <td class="tx2">RBI flagged accounting discrepancies · review ordered</td>
+        <td class="r neg">−4.20%</td><td class="r neg">−6.80%</td><td class="r tx3">—</td>
+        <td class="c pos">●</td><td class="c"><span class="acc">★★★★★</span></td><td class="c pos">●</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,5 L15,4 L30,6 L45,5 L60,8 L65,9 L75,16 L90,18 L105,19 L120,18 L130,17" stroke="#F87171"/><line x1="65" y1="0" x2="65" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      <tr class="evt-stripe-acc">
+        <td class="mono">2026-05-09</td><td class="sym">ADANIENT</td><td class="tx2">Infra</td>
+        <td><span class="pill fill-evt evt">Large Order</span></td>
+        <td class="tx2">₹1,200 Cr infra contract awarded · stock +5.4% intraday</td>
+        <td class="r pos">+5.40%</td><td class="r tx3">—</td><td class="r tx3">—</td>
+        <td class="c pos">●</td><td class="c"><span class="acc">★★★</span><span class="tx3">★★</span></td><td class="c pos">●</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,12 L15,11 L30,10 L45,12 L60,11 L75,4 L90,3 L105,5 L120,6 L130,5" stroke="#A78BFA"/><line x1="75" y1="0" x2="75" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      <tr>
+        <td class="mono">2026-05-09</td><td class="sym">DIVISLAB</td><td class="tx2">Pharma</td>
+        <td><span class="pill fill-info info">Earnings</span></td>
+        <td class="tx2">Q4 results · revenue beat consensus +12%</td>
+        <td class="r pos">+1.20%</td><td class="r neg">−2.40%</td><td class="r tx3">—</td>
+        <td class="c tx2">●</td><td class="c"><span class="acc">★★★★</span><span class="tx3">★</span></td><td class="c pos">●</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,10 L15,11 L30,9 L45,10 L60,9 L75,7 L90,9 L105,12 L120,14 L130,15" stroke="#60A5FA"/><line x1="75" y1="0" x2="75" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      <tr>
+        <td class="mono">2026-05-02</td><td class="sym">BHARTIARTL</td><td class="tx2">Telecom</td>
+        <td><span class="pill fill-info info">Earnings</span></td>
+        <td class="tx2">Q4 results · ARPU growth, EBITDA beat</td>
+        <td class="r pos">+2.80%</td><td class="r pos">+5.40%</td><td class="r pos">+8.20%</td>
+        <td class="c pos">●</td><td class="c"><span class="acc">★★★</span><span class="tx3">★★</span></td><td class="c tx3">○</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,15 L15,14 L30,13 L45,12 L60,12 L72,10 L90,7 L105,5 L120,3 L130,2" stroke="#4ADE80"/><line x1="72" y1="0" x2="72" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      <tr>
+        <td class="mono">2026-04-28</td><td class="sym">BAJFINANCE</td><td class="tx2">Financials</td>
+        <td><span class="pill fill-info info">Earnings</span></td>
+        <td class="tx2">Q4 results · NII +14%, AUM growth slowing</td>
+        <td class="r neg">−2.20%</td><td class="r neg">−5.80%</td><td class="r neg">−12.40%</td>
+        <td class="c tx2">●</td><td class="c"><span class="acc">★★</span><span class="tx3">★★★</span></td><td class="c tx3">○</td>
+        <td><svg class="spark" viewBox="0 0 130 22" width="130" height="22"><path d="M0,7 L15,6 L30,8 L45,7 L60,9 L70,11 L85,14 L100,16 L115,18 L130,19" stroke="#F87171"/><line x1="70" y1="0" x2="70" y2="22" stroke="#F4A340" stroke-dasharray="2 2"/></svg></td>
+      </tr>
+      </tbody>
+    </table>
+    <div class="px-4 py-2 border-t hl mono text-[10px] tx3 flex justify-between">
+      <span>row tint blue → upcoming · red stripe = regulatory · purple stripe = M&amp;A/large-order</span>
+      <span>showing 9 · paginate · 25 / page</span>
+    </div>
+  </div>
+</details>
+
+<!-- ============ FOOTER ============ -->
+<footer class="px-7 py-6 border-t hl mono text-[10px] tx3 flex flex-wrap items-center justify-between gap-3">
+  <div class="flex items-center gap-4">
+    <span class="serif text-[13px] not-italic" style="color:var(--tx2)">Starfish · Nifty 50 Terminal</span>
+    <span>mock · 2026-05-10</span>
+    <span>data: <span class="acc">mart_stock_signals</span> · <span class="acc">mart_volume_anomaly</span> · <span class="acc">fact_corporate_event</span></span>
+  </div>
+  <div class="flex items-center gap-4">
+    <span><span class="tx2">↑↓</span> rows</span>
+    <span><span class="tx2">⇧⏎</span> drill</span>
+    <span><span class="tx2">/</span> filter</span>
+    <span><span class="tx2">e</span> export</span>
+    <span><span class="tx2">w</span> watchlist</span>
+    <span><span class="tx2">?</span> help</span>
+  </div>
+</footer>
+
+<script>
+  // Toggle accordions: clicking the section number/kicker keeps default browser <details> behavior.
+  // Add Alt+click on chev to collapse all/expand all for ergonomics.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'a' && e.altKey) {
+      document.querySelectorAll('details').forEach(d => d.open = true);
+    }
+    if (e.key === 'c' && e.altKey) {
+      document.querySelectorAll('details').forEach(d => d.open = false);
+    }
+  });
+
+  // ===== Trend Workbench: deterministic mock data generators =====
+  // Seeded RNG for reproducible visuals
+  function mulberry32(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = seed;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ----- Volume bars (130 trading days, synced under price chart) -----
+  (function renderVolumeBars() {
+    const svg = document.getElementById('vol-bars');
+    if (!svg) return;
+    const N = 130, W = 800, H = 64, padR = 4;
+    const usable = W - padR;
+    const barW = (usable / N) * 0.78;
+    const gap = (usable / N) - barW;
+    const rng = mulberry32(7);
+    // generate volumes — base 8.2M, occasional spikes synced with up/down days
+    const bars = [];
+    for (let i = 0; i < N; i++) {
+      // gentle uptrend in second half (matching price chart)
+      const trend = i / N;
+      const drift = (rng() - 0.45);                // up-bias
+      const dayRet = drift * 0.025;                 // ±2.5%
+      let vol = 6 + rng() * 6;                      // 6-12 M baseline
+      // 4 explicit spike bars (events / breakouts)
+      if (i === 18) { vol = 24; }                  // earnings prior
+      if (i === 56) { vol = 22; }                  // earnings beat
+      if (i === 90) { vol = 28; }                  // L.Order
+      if (i === 124) { vol = 19; }                 // 52WH push
+      if (Math.abs(dayRet) > 0.02) vol *= 1.6;
+      bars.push({ vol, ret: dayRet });
+    }
+    const maxVol = Math.max(...bars.map(b => b.vol)) * 1.1;
+    const baseY = 60;
+    let html = '';
+    for (let i = 0; i < N; i++) {
+      const b = bars[i];
+      const h = (b.vol / maxVol) * 56;
+      const x = i * (barW + gap);
+      const y = baseY - h;
+      const color = b.ret >= 0 ? '#4ADE80' : '#F87171';
+      const opacity = b.vol > 18 ? 1.0 : (b.vol > 12 ? 0.85 : 0.55);
+      html += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" fill="${color}" opacity="${opacity}"/>`;
+    }
+    // 20D moving avg line
+    const ma = [];
+    for (let i = 0; i < N; i++) {
+      const win = bars.slice(Math.max(0, i - 19), i + 1).map(b => b.vol);
+      ma.push(win.reduce((a, c) => a + c, 0) / win.length);
+    }
+    let pts = ma.map((v, i) => {
+      const x = i * (barW + gap) + barW / 2;
+      const y = baseY - (v / maxVol) * 56;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' L');
+    html += `<path d="M${pts}" stroke="#F4A340" stroke-width="1" fill="none" opacity=".8"/>`;
+    svg.insertAdjacentHTML('beforeend', html);
+  })();
+
+  // ----- Calendar heatmap: 252 trading days, 5 weekdays × ~52 weeks -----
+  (function renderCalendar() {
+    const cal = document.getElementById('cal-heatmap');
+    if (!cal) return;
+    const rng = mulberry32(42);
+    const TOTAL = 252;
+    const colors = [
+      '#5A1A1F', // <= -3
+      '#7A2228', // -3 .. -1.5
+      '#9A2D2D', // -1.5 .. -0.5
+      '#2C2C30', // -0.5 .. 0.5  (neutral / muted)
+      '#2A6739', // 0.5 .. 1.5
+      '#33874A', // 1.5 .. 3
+      '#3FA85C', // > 3
+    ];
+    const bucket = (r) => {
+      if (r < -3) return 0;
+      if (r < -1.5) return 1;
+      if (r < -0.5) return 2;
+      if (r <= 0.5) return 3;
+      if (r <= 1.5) return 4;
+      if (r <= 3) return 5;
+      return 6;
+    };
+    const days = [];
+    for (let i = 0; i < TOTAL; i++) {
+      // skewed distribution: 55% positive, 45% negative; tails sparse
+      const u = rng();
+      // map to roughly N(0.08, 1.1) %
+      const x = (rng() + rng() + rng() - 1.5) * 1.6 + 0.08;
+      let r = x;
+      // deliberate spike days for narrative
+      if (i === 30) r = -3.2;
+      if (i === 84) r = 3.4;
+      if (i === 168) r = 4.8;     // L.Order day
+      if (i === 200) r = 2.1;
+      if (i === 240) r = -2.3;
+      days.push(r);
+    }
+
+    // dates — last 252 weekdays counting backward from 2026-05-09 (Sat) → start at Fri 2026-05-08
+    const end = new Date('2026-05-08T00:00:00');
+    const dows = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dates = [];
+    let cursor = new Date(end);
+    while (dates.length < TOTAL) {
+      const d = cursor.getDay();
+      if (d !== 0 && d !== 6) dates.unshift(new Date(cursor)); // weekday
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    let html = '';
+    for (let i = 0; i < TOTAL; i++) {
+      const r = days[i];
+      const c = colors[bucket(r)];
+      const d = dates[i];
+      const label = `${d.getDate().toString().padStart(2, '0')} ${months[d.getMonth()]} ${dows[d.getDay()]} · ${r >= 0 ? '+' : ''}${r.toFixed(2)}%`;
+      const ring = (i === 168) ? 'box-shadow: inset 0 0 0 1px #F4A340;' : '';
+      html += `<div title="${label}" style="background:${c};border-radius:1px;${ring}"></div>`;
+    }
+    cal.insertAdjacentHTML('beforeend', html);
+  })();
+</script>
+
+</body>
+</html>
