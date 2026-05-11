@@ -167,6 +167,9 @@ cython_debug/
 # Mac
 .DS_Store
 
+# Playwright MCP snapshot artifacts
+.playwright-mcp/
+
 # Claude / Gemini artifacts
 .claude/
 .gemini/
