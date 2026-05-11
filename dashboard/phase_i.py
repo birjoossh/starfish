@@ -125,7 +125,7 @@ def render_signals_table_mobile(signals_df: pd.DataFrame, n: int = 20):
     # Mobile: Use st.dataframe with column config
     st.dataframe(
         df[list(rename_map.values())],
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
     )
 
@@ -254,7 +254,7 @@ def render_view_desktop():
     top_df["return_1d"] = top_df["return_1d"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "N/A")
     top_df["return_1m"] = top_df["return_1m"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "N/A")
     top_df["iss_score"] = top_df["iss_score"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
-    st.dataframe(top_df, use_container_width=True, hide_index=True)
+    st.dataframe(top_df, width='stretch', hide_index=True)
 
 
 if __name__ == "__main__":

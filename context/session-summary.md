@@ -1,7 +1,7 @@
 # Session Summary — Dashboard Consolidation (single-page rewrite)
 
 **Active branch:** `feature/dashboard-consolidation` (pushed to `origin` 2026-05-11; do not force-push).
-**Status as of 2026-05-11:** Phases 0, 1, 2, 3, 4–8 of 10 complete. Phase 9 (cross-cutting polish) is the only remaining phase.
+**Status as of 2026-05-11:** All 10 phases (0, 1, 2, 3, 4–8, 9) complete. Local commit pending review of Phase 9 changeset before push.
 **Visual contract:** `design/mock_consolidated.html` (locked).
 **Implementation plan:** `docs/dashboard_consolidation_plan.md` (locked).
 
@@ -81,7 +81,7 @@ python -c "from streamlit.testing.v1 import AppTest; at = AppTest.from_file('das
 | 2 · §02 Watchlist + ISS Gauge | DONE 2026-05-11 | `section_watchlist.py` + inline-SVG mini-gauge + CSV export. Factor breakdown stubbed pending TODO-122. |
 | 3 · §03 Trend Workbench (NEW) | DONE 2026-05-11 | `services/trend_stats.py` (27 unit tests passing) + `api/routers/trend.py` + `dashboard/section_trend.py` (filter row · Plotly subplot · calendar heatmap · stats sidebar · sector strip). |
 | 4–8 · §04–§08 refactor | DONE 2026-05-11 | §04 fully restyled in `section_movers.py` (filter bar · gainers/losers · scatter · row-click drill into §03). §05–§08 ship working content via thin wrappers around legacy `phase_f` / `phase_g` renderers; full retokenize + drill-in deferred to Phase 9. |
-| **9 · Polish** | **NEXT** | date scrubber, keybindings, `use_container_width` migration, §05–§07 retokenize, row-click drill-in for §05–§07, responsive, smoke test |
+| **9 · Polish** | **DONE 2026-05-11** | `use_container_width` → `width='stretch'` migration · responsive `@media` in tokens.py · date scrubber (`select_slider` + ◀/▶ buttons via `on_click` callbacks) · Expand/Collapse-all header buttons (replaces the failed Phase 0 iframe-JS attempt) · `section_drawdown.py` + `section_momentum.py` + `section_volume.py` retokenized with primitives + row-click drill-in to §03 · `st.spinner` skeletons on the three slow fetches · `integration/scenario_consolidated_dashboard.py` (4 cases, all passing). |
 
 **Commits on `feature/dashboard-consolidation` (pushed to origin):**
 
@@ -95,10 +95,38 @@ python -c "from streamlit.testing.v1 import AppTest; at = AppTest.from_file('das
 | `b18ef69` | Phase 3 — §03 Trend Workbench (NEW) |
 | `eac8bb6` | UI improvements (user) + .gitignore (.playwright-mcp/) |
 | `2c61eee` | Phases 4–8 — §04 retoken + §05–§08 wired |
+| `9a5f474` | Pickup notes — Phase 9 task breakdown |
+| _(pending)_ | Phase 9 — cross-cutting polish (this session) |
 
 ---
 
-## Phase 9 — what to build next (per plan §13)
+## Phase 9 — what landed
+
+**New modules:** `dashboard/section_drawdown.py`, `dashboard/section_momentum.py`, `dashboard/section_volume.py`, `integration/scenario_consolidated_dashboard.py`.
+**Modified:** `dashboard/app.py` (scrubber + expand-all), `dashboard/tokens.py` (responsive @media), `dashboard/primitives.py` (footer label), `dashboard/overview.py` + `dashboard/section_movers.py` + `dashboard/section_trend.py` (spinners + bug fix in `_fetch_movers`), all `dashboard/*.py` migrated off `use_container_width=True`.
+
+| Task | Status |
+|---|---|
+| 9.1 Date scrubber (top bar) | DONE · `select_slider` + ◀/▶ buttons via `on_click` callbacks; lands on `slider_options[-1]` (most recent). |
+| 9.2 "Compare to" delta selector | DEFERRED · low-value vs. cost; revisit when delta-vs-period is requested. |
+| 9.3 Expand/Collapse all | DONE · `st.button` pair toggling `st.session_state.expand_all`; replaces the failed Phase 0 iframe-JS attempt. |
+| 9.4 `use_container_width` → `width='stretch'` | DONE · sweep across `dashboard/*.py`. |
+| 9.5 §05 Drawdown retokenize | DONE · `section_drawdown.py` with filter bar + 4-card KPI strip + tagged drawdown table + row-click drill into §03. Reuses `phase_f.drawdown_signal_tag`. |
+| 9.6 §06 Momentum retokenize | DONE · `section_momentum.py` with 4-tier quality tag (Volume-Confirmed / Event-Driven Pop / Thin Volume / Squeeze Risk / Building), Triple Confirmation ★, Top-15 horizontal bar chart colored by tag. |
+| 9.7 §07 Volume retokenize | DONE · `section_volume.py` with 4-card KPI strip + 3 spike sub-tables (1.2× / 1.5× / 2.0×) + contraction table + 50-cell vol-ratio heatmap + collapsible reading guide + ⚠ Unexplained Spike column. |
+| 9.8 §08 retokenize | STILL DEFERRED · blocked on TODO-119/120 (corp event ingestion). |
+| 9.9 §05–§07 drill-in | DONE · row click in each of the three new section tables sets `trend_subject` + `trend_kind='stock'`. |
+| 9.10 Responsive @media | DONE · `tokens.py` ≤1024 collapses 9-3 grids + `[data-testid=stHorizontalBlock]` flex-wraps; ≤720 single-column. `.sticky-sidebar` un-sticks on narrow. |
+| 9.11 Loading skeletons | DONE · `st.spinner` on `_fetch_movers`, `fetch_market_overview`, `fetch_trend`. |
+| 9.12 Integration smoke test | DONE · `integration/scenario_consolidated_dashboard.py` — 4 tests passing: empty boot, populated boot, scrubber-lands-on-most-recent-date, expand_all default True. Mocks at `config.database.read_sql_df` + `dashboard.watchlist.load_watchlist`; autouse fixture clears `st.cache_data` between tests. |
+
+**Bug fix:** `dashboard/section_movers.py:_fetch_movers` previously assumed `/movers` API returned a dict, but the live endpoint returns `[]` (a list) for unseeded calc dates. Now type-checks `payload` and falls back to canonical empty dict.
+
+**Advisor-caught polish:** Footer cheat-sheet in `primitives.py` no longer advertises `Alt+A / C`; dead conditional removed from `section_volume.py` column_config.
+
+---
+
+## Phase 9 — task table from the implementation plan (historical reference)
 
 | Task | Spec |
 |---|---|

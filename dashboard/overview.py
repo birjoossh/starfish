@@ -61,7 +61,8 @@ def render_overview(
         signals_df: Pre-loaded mart_stock_signals slice for drill-downs.
         watchlist: List of pinned symbols (drives the ★ column in drill).
     """
-    data = fetch_market_overview(calc_date)
+    with st.spinner("Loading market overview…"):
+        data = fetch_market_overview(calc_date)
     sector_df = pd.DataFrame(data.get("sector_breadth", []))
     components = pd.DataFrame(data.get("components", []))
 
@@ -281,7 +282,7 @@ def _render_sector_breadth_panel(sector_df: pd.DataFrame) -> Optional[str]:
 
     event = st.dataframe(
         display,
-        use_container_width=True,
+        width='stretch',
         height=380,
         key="overview_sector_breadth",
         on_select="rerun",
@@ -365,7 +366,7 @@ def _render_treemap_panel(components: pd.DataFrame) -> Optional[str]:
     )
     event = st.plotly_chart(
         fig,
-        use_container_width=True,
+        width='stretch',
         key="overview_treemap",
         on_select="rerun",
     )

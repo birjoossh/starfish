@@ -26,13 +26,20 @@ PERIODS: tuple[str, ...] = ("1D", "1M", "3M", "1Y")
 
 @st.cache_data(ttl=60, show_spinner=False)
 def _fetch_movers(calc_date: str) -> dict[str, Any]:
-    """GET /movers for the calc date. Returns empty dict on failure."""
+    """GET /movers for the calc date. Returns empty dict on failure.
+
+    The /movers endpoint occasionally returns ``[]`` (a list) for dates with
+    no signal data — we coerce to the canonical dict shape so the renderer
+    can rely on ``data.get(...)``.
+    """
     try:
         resp = requests.get(
             f"{API_URL}/movers", params={"calc_date": calc_date}, timeout=5
         )
         if resp.status_code == 200:
-            return resp.json()
+            payload = resp.json()
+            if isinstance(payload, dict):
+                return payload
     except Exception:
         pass
     return {"gainers": [], "losers": [], "all_data": []}
@@ -43,7 +50,8 @@ def _fetch_movers(calc_date: str) -> dict[str, Any]:
 
 def render_movers_section(calc_date: str, signals_df: pd.DataFrame) -> None:
     """Render §04 Movers & Extremes."""
-    data = _fetch_movers(calc_date)
+    with st.spinner("Loading movers…"):
+        data = _fetch_movers(calc_date)
     gainers = pd.DataFrame(data.get("gainers") or [])
     losers = pd.DataFrame(data.get("losers") or [])
     all_df = pd.DataFrame(data.get("all_data") or [])
@@ -140,7 +148,7 @@ def _render_movers_table(df: pd.DataFrame, *, kind: str, slot_key: str) -> None:
 
     event = st.dataframe(
         display,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=min(440, 60 + len(display) * 36),
         key=f"{slot_key}_df",
@@ -268,7 +276,7 @@ def _render_scatter(df: pd.DataFrame) -> None:
         "size = ISS · color = sector · gold border = vol-confirmed gainer</div>",
         unsafe_allow_html=True,
     )
-    st.plotly_chart(fig, use_container_width=True, key="movers_scatter")
+    st.plotly_chart(fig, width='stretch', key="movers_scatter")
 
 
 __all__ = ["render_movers_section"]

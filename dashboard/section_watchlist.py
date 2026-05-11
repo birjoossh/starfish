@@ -425,7 +425,7 @@ def _render_category_panel(
 
     event = st.dataframe(
         display,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=min(440, 60 + len(display) * 36),
         key=f"{slot_key}_df",

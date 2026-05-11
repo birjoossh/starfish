@@ -110,7 +110,8 @@ def render_trend_section(calc_date: str, signals_df: pd.DataFrame) -> None:
         )
         return
 
-    payload = fetch_trend(subject, kind, period, calc_date)
+    with st.spinner(f"Loading {period} trend for {subject}…"):
+        payload = fetch_trend(subject, kind, period, calc_date)
 
     col_main, col_side = st.columns([9, 3], gap="small")
     with col_main:
@@ -366,7 +367,7 @@ def _render_price_volume_chart(payload: dict[str, Any]) -> None:
     # them in a `<div class="panel">` opened via st.markdown does NOT nest
     # (each st.markdown is a separate element). We render the chart bare and
     # add the events annotation as a separate markdown element below.
-    st.plotly_chart(fig, use_container_width=True, key="trend_main_chart")
+    st.plotly_chart(fig, width='stretch', key="trend_main_chart")
     if not events:
         st.markdown(
             '<div class="mono" style="font-size:10px;color:var(--tx3);'
@@ -454,7 +455,7 @@ def _render_calendar_heatmap(payload: dict[str, Any]) -> None:
 """,
         unsafe_allow_html=True,
     )
-    st.plotly_chart(fig, use_container_width=True, key="trend_cal_heatmap")
+    st.plotly_chart(fig, width='stretch', key="trend_cal_heatmap")
 
 
 # ----------------------------- Stats sidebar ----------------------------- #
