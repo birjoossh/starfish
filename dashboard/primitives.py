@@ -221,7 +221,7 @@ def render_footer() -> None:
     <span><span class="tx2">/</span> filter</span>
     <span><span class="tx2">e</span> export</span>
     <span><span class="tx2">w</span> watchlist</span>
-    <span><span class="tx2">Alt+A / C</span> open/close all</span>
+    <span><span class="tx2">Expand / Collapse all</span> · top-of-§04 buttons</span>
     <span><span class="tx2">?</span> help</span>
   </div>
 </footer>

@@ -36,7 +36,16 @@ from dashboard.primitives import (
     render_section_header,
     render_topbar,
 )
+from dashboard.section_drawdown import render_drawdown_section
+from dashboard.section_momentum import render_momentum_section
+from dashboard.section_movers import render_movers_section
+from dashboard.section_trend import render_trend_section
+from dashboard.section_volume import render_volume_section
+from dashboard.section_watchlist import render_watchlist_section
 from dashboard.tokens import inject_global_styles
+
+# §08 still wraps phase_g pending TODO-119/120 (corp event ingestion).
+from dashboard.phase_g import render_events_tracker  # noqa: E402
 
 
 API_URL = "http://localhost:8000"
@@ -108,43 +117,67 @@ def _render_section_01_market_overview(
     render_overview(calc_date, signals_df, watchlist)
 
 
-def _render_section_02_watchlist(calc_date: str) -> None:
-    render_section_header("02", "Watchlist · Auto-curated + Pinned", hint="always open")
-    _placeholder("§02 Watchlist — Phase 2 will land here.")
+def _render_section_02_watchlist(
+    calc_date: str,
+    signals_df: pd.DataFrame,
+) -> None:
+    render_section_header(
+        "02", "Watchlist · Auto-curated + Pinned", hint="always open"
+    )
+    render_watchlist_section(calc_date, signals_df)
 
 
-def _render_section_03_trend(calc_date: str) -> None:
+def _render_section_03_trend(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header(
         "03",
         "Trend Workbench · Multi-Day Analysis",
         hint="always open · price · volume · ISS over time",
     )
-    _placeholder("§03 Trend Workbench — Phase 3 will land here (NEW).")
+    render_trend_section(calc_date, signals_df)
 
 
-def _render_section_04_movers(calc_date: str) -> None:
+def _render_section_04_movers(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("04", "Movers & Extremes")
-    _placeholder("§04 Movers & Extremes — Phase 4 will land here.")
+    render_movers_section(calc_date, signals_df)
 
 
-def _render_section_05_drawdown(calc_date: str) -> None:
+def _render_section_05_drawdown(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("05", "Drawdown Scanner")
-    _placeholder("§05 Drawdown Scanner — Phase 5 will land here.")
+    render_drawdown_section(calc_date, signals_df)
 
 
-def _render_section_06_momentum(calc_date: str) -> None:
+def _render_section_06_momentum(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("06", "Breakout & Momentum Monitor")
-    _placeholder("§06 Breakout & Momentum — Phase 6 will land here.")
+    render_momentum_section(calc_date, signals_df)
 
 
-def _render_section_07_volume(calc_date: str) -> None:
+def _render_section_07_volume(
+    calc_date: str, signals_df: pd.DataFrame
+) -> None:
     render_section_header("07", "Volume Anomaly Monitor")
-    _placeholder("§07 Volume Anomaly — Phase 7 will land here.")
+    render_volume_section(calc_date, signals_df)
 
 
 def _render_section_08_events(calc_date: str) -> None:
-    render_section_header("08", "Corporate Events Tracker")
-    _placeholder("§08 Corporate Events — Phase 8 will land here.")
+    render_section_header(
+        "08", "Corporate Events Tracker",
+        hint="data: fact_corporate_event · TODO-119/120",
+    )
+    try:
+        render_events_tracker()
+    except Exception as e:
+        _placeholder(
+            f"§08 Events Tracker unavailable: {type(e).__name__}. "
+            "Likely blocked on TODO-119/120 (events table not yet seeded)."
+        )
 
 
 def _placeholder(message: str) -> None:
@@ -162,32 +195,111 @@ def _placeholder(message: str) -> None:
 # ------------------------------ Header strip ----------------------------- #
 
 
-def _render_date_picker(dates: list[str], signals_df: pd.DataFrame) -> str:
-    """Render the calc-date selector + Morning Digest. Returns selected date."""
-    col_date, col_digest = st.columns([2, 7])
-    with col_date:
+def _shift_calc_date(delta: int, options: list[str]) -> None:
+    """Callback for the ◀ / ▶ scrubber buttons. Mutates ``st.session_state.calc_date``."""
+    cur = st.session_state.get("calc_date", options[0])
+    if cur not in options:
+        st.session_state["calc_date"] = options[0]
+        return
+    idx = options.index(cur)
+    new_idx = max(0, min(len(options) - 1, idx + delta))
+    st.session_state["calc_date"] = options[new_idx]
+
+
+def _resolve_selected_date(dates: list[str]) -> tuple[str, list[str]]:
+    """Read or initialize ``st.session_state.calc_date`` against the slider options.
+
+    Returns ``(selected_date, slider_options)`` where ``slider_options`` is the
+    oldest→newest ordering needed by ``st.select_slider``.
+    """
+    slider_options = list(reversed(dates))
+    if (
+        "calc_date" not in st.session_state
+        or st.session_state["calc_date"] not in slider_options
+    ):
+        st.session_state["calc_date"] = slider_options[-1]  # most recent
+    return str(st.session_state["calc_date"]), slider_options
+
+
+def _render_date_picker(slider_options: list[str], signals_df: pd.DataFrame) -> None:
+    """Render the calc-date scrubber + Morning Digest.
+
+    Implements Phase 9.1 (date scrubber): a ``select_slider`` plus Prev/Next
+    buttons. The buttons use ``on_click`` callbacks (Streamlit's supported
+    pattern for widget-writes-another-widget) — never inline writes after
+    widget creation. ``slider_options`` must be oldest→newest.
+    """
+    col_scrub, col_digest = st.columns([4, 7])
+    with col_scrub:
         st.markdown(
-            '<div class="kicker" style="margin-bottom:4px">Calc Date</div>',
+            f'<div class="kicker" style="margin-bottom:4px">Calc Date · scrub the last '
+            f'{len(slider_options)} trading days</div>',
             unsafe_allow_html=True,
         )
-        selected = st.selectbox(
-            "Calc Date",
-            dates,
-            index=0,
-            label_visibility="collapsed",
-            key="calc_date",
-        )
+        c_prev, c_slider, c_next = st.columns([1, 10, 1], gap="small")
+        with c_prev:
+            st.button(
+                "◀", key="calc_date_prev", help="Older trading day",
+                on_click=_shift_calc_date, args=(-1, slider_options),
+            )
+        with c_slider:
+            st.select_slider(
+                "Calc Date",
+                options=slider_options,
+                label_visibility="collapsed",
+                key="calc_date",
+            )
+        with c_next:
+            st.button(
+                "▶", key="calc_date_next", help="Newer trading day",
+                on_click=_shift_calc_date, args=(1, slider_options),
+            )
     with col_digest:
         render_morning_digest(signals_df)
-    return str(selected)
+
+
+def _set_expand_all(value: bool) -> None:
+    """Callback for the expand/collapse buttons."""
+    st.session_state["expand_all"] = value
+
+
+def _render_expand_controls() -> bool:
+    """Render Expand-all / Collapse-all buttons; return the current flag.
+
+    Phase 9.3 — replaces the keybindings-via-iframe-JS anti-pattern caught in
+    Phase 0 review. Two buttons mutate ``st.session_state.expand_all`` via
+    ``on_click`` callbacks; the collapsibles below construct their
+    ``expanded=`` arg from this flag.
+    """
+    if "expand_all" not in st.session_state:
+        st.session_state["expand_all"] = True
+    expanded = bool(st.session_state["expand_all"])
+    state_label = "all open" if expanded else "all closed"
+    c_pad, c_a, c_c = st.columns([8, 1, 1], gap="small")
+    with c_pad:
+        st.markdown(
+            f'<div class="kicker" style="text-align:right;padding-top:8px">{state_label}</div>',
+            unsafe_allow_html=True,
+        )
+    with c_a:
+        st.button(
+            "Expand all", key="expand_all_btn", help="Open §04–§08",
+            on_click=_set_expand_all, args=(True,),
+        )
+    with c_c:
+        st.button(
+            "Collapse all", key="collapse_all_btn", help="Close §04–§08",
+            on_click=_set_expand_all, args=(False,),
+        )
+    return expanded
 
 
 # ----------------------------- Entry point ------------------------------- #
 #
-# Keyboard shortcuts (Alt+A expand-all / Alt+C collapse-all) are deferred to
-# Phase 9 — they cannot be implemented via ``components.v1.html`` because that
-# runs in a sandboxed iframe and cannot mutate parent-document expanders. The
-# correct path is a Streamlit custom component or a header button row.
+# Expand/Collapse controls are rendered via :func:`_render_expand_controls`
+# above (Phase 9.3). The keybinding-via-iframe-JS approach attempted in
+# Phase 0 cannot mutate parent-document expanders because the component runs
+# in a sandboxed iframe; the header button row is the supported alternative.
 
 
 def main() -> None:
@@ -214,34 +326,33 @@ def main() -> None:
 
     render_brand_header()
 
-    # Pre-load signals once at the date pick so every section sees the same
-    # frame. selectbox writes to st.session_state.calc_date; we read it back
-    # from the function return so the very first render uses dates[0].
-    initial_date = dates[0] if dates else dt.date.today().isoformat()
-    signals_df = _load_signals(initial_date)
+    # Resolve the selected date from session state BEFORE loading signals, so
+    # every section (including the Morning Digest below) sees the correct date
+    # on first render after a scrubber click.
+    selected_date, slider_options = _resolve_selected_date(dates)
+    signals_df = _load_signals(selected_date)
     watchlist = _load_watchlist()
 
-    selected_date = _render_date_picker(dates, signals_df)
-
-    # If the user changed the date, re-load signals for the new date.
-    if selected_date != initial_date:
-        signals_df = _load_signals(selected_date)
+    _render_date_picker(slider_options, signals_df)
 
     # ----- Hero sections (always rendered) -----
     _render_section_01_market_overview(selected_date, signals_df, watchlist)
-    _render_section_02_watchlist(selected_date)
-    _render_section_03_trend(selected_date)
+    _render_section_02_watchlist(selected_date, signals_df)
+    _render_section_03_trend(selected_date, signals_df)
 
     # ----- Collapsible scanner sections -----
-    for header, hint, fn in [
-        ("04 · Movers & Extremes", "10 G · 10 L", _render_section_04_movers),
-        ("05 · Drawdown Scanner", "≥ 20%", _render_section_05_drawdown),
-        ("06 · Breakout & Momentum Monitor", "3M > 20%", _render_section_06_momentum),
-        ("07 · Volume Anomaly Monitor", "3 tiers", _render_section_07_volume),
-        ("08 · Corporate Events Tracker", "last 7d · next 7d", _render_section_08_events),
-    ]:
-        with st.expander(f"§ {header}   ·   {hint}", expanded=True):
-            fn(selected_date)
+    # Expand/Collapse buttons drive the `expanded=` flag on every expander.
+    expanded = _render_expand_controls()
+    with st.expander("§ 04 · Movers & Extremes   ·   10 G · 10 L", expanded=expanded):
+        _render_section_04_movers(selected_date, signals_df)
+    with st.expander("§ 05 · Drawdown Scanner   ·   ≥ 20%", expanded=expanded):
+        _render_section_05_drawdown(selected_date, signals_df)
+    with st.expander("§ 06 · Breakout & Momentum Monitor   ·   3M > 20%", expanded=expanded):
+        _render_section_06_momentum(selected_date, signals_df)
+    with st.expander("§ 07 · Volume Anomaly Monitor   ·   3 tiers", expanded=expanded):
+        _render_section_07_volume(selected_date, signals_df)
+    with st.expander("§ 08 · Corporate Events Tracker   ·   last 7d · next 7d", expanded=expanded):
+        _render_section_08_events(selected_date)
 
     render_footer()
 

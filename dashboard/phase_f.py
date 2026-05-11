@@ -172,7 +172,7 @@ def render_drawdown_tab(df: pd.DataFrame) -> None:
 
     st.dataframe(
         show,
-        use_container_width=True,
+        width='stretch',
         height=min(520, 40 + len(show) * 36),
         hide_index=True,
         column_config={
@@ -207,7 +207,7 @@ def render_drawdown_tab(df: pd.DataFrame) -> None:
             },
         )
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=40, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 
 def render_momentum_tab(df: pd.DataFrame) -> None:
@@ -273,7 +273,7 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
         ]
         st.dataframe(
             m_show,
-            use_container_width=True,
+            width='stretch',
             height=min(400, 40 + len(m_show) * 36),
             hide_index=True,
             column_config={
@@ -329,7 +329,7 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
         n_show.columns = ["Symbol", "Company", "Sector", "Close", "DD vs 52W %", "Vol 1D/20D", "ISS"]
         st.dataframe(
             n_show,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             height=min(320, 40 + len(n_show) * 36),
             column_config={
@@ -365,7 +365,7 @@ def render_momentum_tab(df: pd.DataFrame) -> None:
         )
         fig.add_vline(x=0, line_dash="dash", line_color="gray")
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", yaxis_title="", xaxis_title="RS vs Nifty 3M (%)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 
 def render_volume_tab(df: pd.DataFrame, calc_date: str) -> None:
@@ -379,7 +379,7 @@ def render_volume_tab(df: pd.DataFrame, calc_date: str) -> None:
         render_info("volume_anomaly_mart")
         st.dataframe(
             mart,
-            use_container_width=True,
+            width='stretch',
             height=min(400, 40 + len(mart) * 36),
             hide_index=True,
             column_config={
@@ -418,7 +418,7 @@ def render_volume_tab(df: pd.DataFrame, calc_date: str) -> None:
                     sub,
                     hide_index=True,
                     height=min(260, 36 * (len(sub) + 1)),
-                    use_container_width=True,
+                    width='stretch',
                     column_config={
                         "Vol 20D": st.column_config.NumberColumn(format="%.2fx", help=tooltip("vol_ratio_1d")),
                         "1D %": st.column_config.NumberColumn(format="%+.2f%%", help=tooltip("return_1d")),

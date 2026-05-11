@@ -418,7 +418,7 @@ def _render_watchlist_items(items: list[dict], category_name: str) -> None:
     # Display table with formatting
     st.dataframe(
         df,
-        use_container_width=True,
+        width='stretch',
         height=min(500, 40 + len(df) * 36),
         hide_index=True,
         column_config={

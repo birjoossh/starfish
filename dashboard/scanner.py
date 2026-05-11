@@ -105,7 +105,7 @@ def render_scanner_drilldown(
     )
     st.dataframe(
         display_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=min(420, 60 + len(display_df) * 36),
         key=key,

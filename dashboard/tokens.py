@@ -224,6 +224,33 @@ details summary,
 /* Blink for "live" indicators (used sparingly) */
 .blink { animation: blink 1.6s infinite; }
 @keyframes blink { 50% { opacity: .35; } }
+
+/* ===== Responsive: collapse 9-3 grids + multi-col KPI strips on tablet/below ===== */
+@media (max-width: 1024px) {
+  .block-container { padding-left: .75rem !important; padding-right: .75rem !important; }
+  /* Streamlit horizontal blocks become vertical stacks */
+  [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; }
+  [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  /* Sticky sidebar stops sticking — content flows underneath chart on narrow */
+  .sticky-sidebar { position: static !important; }
+  /* Sector strip / KPI grids: cap minmax to readable single-col */
+  div[style*="grid-template-columns:repeat"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* Brand wordmark shrinks */
+  h1.serif { font-size: 44px !important; }
+  h1.serif span.serif { font-size: 28px !important; margin-left: 8px !important; }
+}
+@media (max-width: 720px) {
+  div[style*="grid-template-columns:repeat"] {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  h1.serif { font-size: 34px !important; }
+}
 </style>
 """
 

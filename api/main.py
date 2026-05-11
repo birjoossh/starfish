@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from config.database import check_db_health, read_sql_df
 
 # Import routers
-from api.routers import events, watchlist
+from api.routers import events, trend, watchlist
 
 
 def _sanitize_api_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -66,6 +66,7 @@ app.add_middleware(
 # Include routers
 app.include_router(events.router, prefix="/api/v1")
 app.include_router(watchlist.router, prefix="/api/v1")
+app.include_router(trend.router)  # exposed at /trend (no /api/v1 prefix for Streamlit)
 
 
 # ---- Response models ----
