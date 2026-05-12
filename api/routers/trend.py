@@ -16,8 +16,10 @@ needed by ``dashboard/section_trend.py``:
     }
 
 Backend gaps handled gracefully:
-    * Nifty 50 index prices not yet ingested (TODO-106) → `rs_vs_nifty_series`
-      is ``None``; the frontend hides the overlay and surfaces a pill.
+    * Nifty 50 index prices (``nifty50_index_prices``) may not yet cover the
+      requested window — the endpoint returns ``rs_vs_nifty_series: null``
+      and the stats sidebar's ``vs_nifty_pp`` value is ``None``; the
+      frontend surfaces a pill when this happens.
     * Corporate events table may be empty (TODO-119/120) → `events` is `[]`.
     * ISS factor decomposition not computed (TODO-122) → only the scalar
       ``iss_score`` (which is currently 0.0 for everyone) flows through.
@@ -109,6 +111,68 @@ def _sector_constituents(sector: str, as_of: dt.date) -> list[str]:
         params={"sector": sector},
     )
     return df["symbol"].astype(str).tolist() if not df.empty else []
+
+
+def _fetch_index_history(from_d: dt.date, to_d: dt.date) -> pd.DataFrame:
+    """Pull Nifty 50 index close prices for the date range from
+    ``nifty50_index_prices`` (populated by TODO-106 ingestion).
+
+    Returns an empty frame when no rows exist — callers must treat
+    "no data" as the explicit "RS unavailable" branch.
+    """
+    return read_sql_df(
+        """
+        SELECT trade_date, close
+        FROM nifty50_index_prices
+        WHERE trade_date BETWEEN :from_d AND :to_d
+        ORDER BY trade_date ASC
+        """,
+        params={"from_d": from_d, "to_d": to_d},
+    )
+
+
+def _compute_rs_series(
+    price_dates: list[str],
+    price_closes: list[float],
+    nifty_df: pd.DataFrame,
+) -> Optional[list[dict[str, Any]]]:
+    """Compute per-day RS-vs-Nifty series: cumulative stock return minus
+    cumulative index return, anchored at the window's first overlapping date.
+
+    Returns ``None`` when the index series is missing or has no overlap
+    with the price dates — the dashboard treats that as "hide the overlay".
+    """
+    if nifty_df.empty or "close" not in nifty_df.columns or not price_dates:
+        return None
+
+    nifty_by_date = {
+        str(d): float(c)
+        for d, c in zip(
+            pd.to_datetime(nifty_df["trade_date"]).dt.date.astype(str),
+            nifty_df["close"].astype(float),
+        )
+    }
+    # Anchor at the first date that appears in BOTH series.
+    anchor_price: Optional[float] = None
+    anchor_nifty: Optional[float] = None
+    series: list[dict[str, Any]] = []
+    for d, c in zip(price_dates, price_closes):
+        n = nifty_by_date.get(d)
+        if n is None:
+            series.append({"date": d, "value": None})
+            continue
+        if anchor_price is None:
+            anchor_price = float(c)
+            anchor_nifty = float(n)
+            series.append({"date": d, "value": 0.0})
+            continue
+        stock_ret = float(c) / anchor_price - 1.0
+        idx_ret = float(n) / anchor_nifty - 1.0
+        series.append({"date": d, "value": (stock_ret - idx_ret) * 100.0})
+    # Treat "no overlap at all" as missing — callers will hide the overlay.
+    if anchor_price is None:
+        return None
+    return series
 
 
 def _iss_series(symbol: str, from_d: dt.date, to_d: dt.date) -> pd.DataFrame:
@@ -224,9 +288,16 @@ def get_trend(
         else None
     )
 
+    # Nifty 50 index series for the same window — drives both the RS overlay
+    # and the ``vs_nifty_pp`` stat. Empty frame ⇒ overlay hidden + stat None.
+    nifty_df = _fetch_index_history(from_d, to_d)
+    rs_vs_nifty_series = _compute_rs_series(
+        dates, [float(c) for c in closes], nifty_df
+    )
+
     stats = compute_period_stats(
         agg,
-        nifty_df=None,  # TODO-106: wire when nifty50_index_prices is seeded
+        nifty_df=nifty_df if not nifty_df.empty else None,
         avg_delivery_pct=avg_delivery,
         iss_now=iss_now,
         iss_period_avg=iss_avg,
@@ -242,7 +313,7 @@ def get_trend(
         "volume_series": volume_series,
         "sma_50": sma50_series,
         "sma_200": sma200_series,
-        "rs_vs_nifty_series": None,  # blocked on TODO-106
+        "rs_vs_nifty_series": rs_vs_nifty_series,
         "iss_series": iss_series,
         "events": [],  # blocked on TODO-119/120 (events table populate)
         "period_stats": stats,

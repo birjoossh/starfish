@@ -38,19 +38,53 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _ingest_index_price(trade_date: date) -> int:
+    """Download + load the Nifty 50 close for ``trade_date``.
+
+    Returns the number of rows inserted (1 on success, 0 on miss/holiday).
+    Reuses ``BackfillOrchestrator`` cache + download + upsert plumbing so the
+    daily path stays in sync with the bulk-backfill path without duplicating
+    code (TODO-106 daily wiring).
+    """
+    from ingestion.backfill.orchestrator import BackfillOrchestrator
+    from ingestion.nse_client import CircuitBreakerOpen
+
+    orch = BackfillOrchestrator()
+    path = orch._get_index_cache_path(trade_date)
+    if not path.exists():
+        try:
+            path = orch.download_index_csv(trade_date)
+        except CircuitBreakerOpen as e:
+            logger.error(f"Index download — circuit breaker open: {e}")
+            return 0
+        except Exception as e:
+            if orch._is_holiday(e):
+                logger.info(f"Index — holiday/no data on {trade_date}")
+                orch.client.reset_circuit()
+            else:
+                logger.warning(f"Index download failed for {trade_date}: {e}")
+            return 0
+    if not path.exists():
+        return 0
+    return orch.parse_and_load_index_csv(path, trade_date)
+
+
 def ingest_single_date(
     trade_date: date,
     local_dir: Path | None = None,
     corporate_actions_csv: Path | None = None,
     corporate_events_csv: Path | None = None,
     compute_signals_flag: bool = False,
+    skip_index: bool = False,
 ) -> dict:
-    """Ingest bhavcopy for a single date.
+    """Ingest bhavcopy + Nifty 50 index price for a single date.
 
     Tries NSE download first, falls back to local source if circuit breaker trips.
+    Index ingestion (TODO-106) runs after bhavcopy unless ``skip_index=True``.
 
     Returns:
-        Dict with ingestion stats.
+        Dict with ingestion stats. Adds ``index_rows`` (0 or 1) when index
+        ingestion runs.
     """
     parser = BhavcopyParser()
     loader = BhavcopyLoader()
@@ -103,6 +137,16 @@ def ingest_single_date(
     stats = loader.load(df, source_file=source_file)
     stats["date"] = str(trade_date)
 
+    # Nifty 50 index close — feeds RS-vs-Nifty across mart_stock_signals + §03.
+    if skip_index:
+        stats["index_rows"] = None
+    else:
+        try:
+            stats["index_rows"] = _ingest_index_price(trade_date)
+        except Exception as e:
+            logger.warning(f"Index ingestion failed for {trade_date}: {e}")
+            stats["index_rows"] = 0
+
     if corporate_actions_csv is not None and corporate_actions_csv.exists():
         from ingestion.corporate_actions_parser import CorporateActionsParser
         from ingestion.corporate_actions_loader import CorporateActionsLoader
@@ -138,6 +182,7 @@ def backfill(
     corporate_actions_csv: Path | None = None,
     corporate_events_csv: Path | None = None,
     compute_signals_flag: bool = False,
+    skip_index: bool = False,
 ) -> list[dict]:
     """Backfill a date range.
 
@@ -155,6 +200,7 @@ def backfill(
                 corporate_actions_csv=corporate_actions_csv,
                 corporate_events_csv=corporate_events_csv,
                 compute_signals_flag=compute_signals_flag,
+                skip_index=skip_index,
             )
             results.append(stats)
             logger.info(f"[{current}] {stats['status']}: {stats.get('rows_inserted', 0)} rows")
@@ -187,12 +233,18 @@ def main():
         action="store_true",
         help="Run analytics.compute_signals for the trade date after ingestion",
     )
+    parser.add_argument(
+        "--skip-index",
+        action="store_true",
+        help="Skip the Nifty 50 index-price ingestion step (TODO-106)",
+    )
 
     args = parser.parse_args()
     local_dir = Path(args.local) if args.local else None
     corp_act = Path(args.corporate_actions) if args.corporate_actions else None
     corp_ev = Path(args.corporate_events) if args.corporate_events else None
     do_signals = bool(args.compute_signals)
+    skip_index = bool(args.skip_index)
 
     if args.date:
         trade_date = date.fromisoformat(args.date)
@@ -202,6 +254,7 @@ def main():
             corporate_actions_csv=corp_act,
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
+            skip_index=skip_index,
         )
         print(f"Result: {stats}")
 
@@ -215,6 +268,7 @@ def main():
             corporate_actions_csv=corp_act,
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
+            skip_index=skip_index,
         )
 
     elif args.start and args.end:
@@ -227,6 +281,7 @@ def main():
             corporate_actions_csv=corp_act,
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
+            skip_index=skip_index,
         )
 
     else:
@@ -237,6 +292,7 @@ def main():
             corporate_actions_csv=corp_act,
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
+            skip_index=skip_index,
         )
         print(f"Result: {stats}")
 
