@@ -319,7 +319,7 @@ def main() -> None:
         nse_live=False,
         date_label=today_label,
         last_load=dates[0] if dates else "—",
-        user="rahul@starfish",
+        user="bg@starfish",
         universe="NIFTY 50",
         latency_ms=42,
     )
