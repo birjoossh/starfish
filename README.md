@@ -76,8 +76,10 @@ Launch both the API and the Streamlit dashboard using the provided script:
 
 ### Daily Ingestion (legacy pipeline — `ingestion/daily_run.py`)
 
+Each run ingests **bhavcopy → `fact_eod_price`** and the **Nifty 50 index close → `nifty50_index_prices`** (the latter feeds the RS-vs-Nifty overlay on §03 Trend Workbench and `mart_stock_signals`). The index step reuses `BackfillOrchestrator`'s download/cache/upsert plumbing and is idempotent; on holidays or HTTP misses it logs and records `index_rows: 0` without failing the run. Pass `--skip-index` to bypass it.
+
 ```bash
-# Today's bhavcopy (default)
+# Today's bhavcopy + Nifty 50 index close (default)
 python -m ingestion.daily_run
 
 # A specific trading date
@@ -92,6 +94,9 @@ python -m ingestion.daily_run --start 2024-01-01 --end 2024-03-31
 # Use a local CSV directory instead of NSE download
 python -m ingestion.daily_run --local /path/to/csvs
 
+# Skip the Nifty 50 index-price step (bhavcopy only)
+python -m ingestion.daily_run --date 2024-01-15 --skip-index
+
 # Ingest bhavcopy + corporate actions + announcements + recompute signals
 python -m ingestion.daily_run \
   --date 2024-01-17 \
@@ -99,6 +104,8 @@ python -m ingestion.daily_run \
   --corporate-events data/ann.csv \
   --compute-signals
 ```
+
+The returned stats dict includes an `index_rows` key (`1` on a successful close, `0` on holiday/miss, `None` when `--skip-index` is set).
 
 ### Ingestion Framework (`ingestion/framework/`)
 
