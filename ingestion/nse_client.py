@@ -169,6 +169,45 @@ class NSEClient:
         logger.info(f"Saved: {output_path}")
         return output_path
 
+    def _mto_url(self, trade_date: date) -> str:
+        """Construct NSE MTO file URL for a given date.
+
+        Format: https://archives.nseindia.com/archives/equities/mto/MTO_DDMMYYYY.DAT
+        """
+        date_str = trade_date.strftime("%d%m%Y")
+        return f"https://archives.nseindia.com/archives/equities/mto/MTO_{date_str}.DAT"
+
+    def download_mto(self, trade_date: date, output_dir: Path | None = None) -> Path:
+        """Download the MTO (delivery-quantity) file for a given trade date.
+
+        The file is typically available on T+1. Caller is responsible for
+        deciding when to invoke this — wiring lives in daily_run.
+
+        Args:
+            trade_date: The trading date the MTO refers to.
+            output_dir: Where to save the .DAT file (defaults to data/mto).
+
+        Returns:
+            Path to the saved MTO file.
+
+        Raises:
+            CircuitBreakerOpen: If the circuit breaker is tripped.
+            requests.exceptions.RequestException: On download failure after retries.
+        """
+        if output_dir is None:
+            output_dir = settings.project_root / "data" / "mto"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        url = self._mto_url(trade_date)
+        logger.info(f"Downloading MTO: {url}")
+
+        resp = self._request_with_retry(url)
+        output_path = output_dir / f"MTO_{trade_date.strftime('%d%m%Y')}.DAT"
+        with open(output_path, "wb") as f:
+            f.write(resp.content)
+        logger.info(f"Saved: {output_path}")
+        return output_path
+
     def download_bhavcopy_range(
         self,
         start_date: date,
