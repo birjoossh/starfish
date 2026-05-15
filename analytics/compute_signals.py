@@ -257,11 +257,15 @@ def compute_signals(trade_date: date | None = None) -> int:
     )
     merged["event_flag"] = past_evt | upcoming_evt
 
-    # Fill NaN for non-nullable columns (insufficient history → 0)
+    # Fill NaN for non-nullable columns (insufficient history → 0).
+    # rs_vs_nifty_1m / 3m / 1y are intentionally absent — when index data or
+    # return history isn't deep enough we want NULL flowing through to the DB
+    # and to the ISS scorer (TODO-122 sub-fix; spec deviation #2). The scorer
+    # uses NULL to apply the spec's explicit default rather than penalising
+    # the factor as a "0% relative return".
     not_null_defaults = {
         "return_1d": 0.0, "return_1m": 0.0, "return_3m": 0.0,
         "vol_ratio_1d": 1.0, "vol_ratio_5d": 1.0, "vol_ratio_20d": 1.0,
-        "rs_vs_nifty_1m": 0.0, "rs_vs_nifty_3m": 0.0,
         "drawdown_from_52w_high_pct": 0.0, "distance_from_52w_low_pct": 0.0,
         "avg_volume_20d": 0, "volume_trend_3m": "Mixed",
         "direction_consistency_20d": 0.0, "intraday_reversal_count_20d": 0,
