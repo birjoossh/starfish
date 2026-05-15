@@ -1,12 +1,18 @@
-"""Corporate events loader: upsert classified events into fact_corporate_event.
+"""Corporate events loader — upsert classified events into ``fact_corporate_event``.
 
-Usage:
+Consumes a DataFrame produced by :class:`CorporateEventsIngestor` (spec
+taxonomy: Earnings / Leadership_Change / M&A / Large_Order / Pledging_Change
+/ Rating_Change / Regulatory / Other) and upserts it with the unique
+``(symbol, event_date, event_type)`` deduplication key.
+
+Usage::
+
     from ingestion.corporate_events_loader import CorporateEventsLoader
-    loader = CorporateEventsLoader()
-    loader.load(df)
+    rows = CorporateEventsLoader().load(df)
 
     # CLI:
-    python -m ingestion.corporate_events_loader --file data/announcements_jan2024.csv --date 2024-01-17
+    python -m ingestion.corporate_events_loader \
+        --file data/announcements_jan2024.csv --date 2024-01-17
 """
 
 from __future__ import annotations
@@ -25,28 +31,18 @@ from ingestion.corporate_events_ingestor import CorporateEventsIngestor
 logger = logging.getLogger(__name__)
 
 
+# Mirrors fact_corporate_event.event_type CHECK constraint.
+VALID_EVENT_TYPES = {
+    "Earnings", "Leadership_Change", "M&A", "Large_Order",
+    "Pledging_Change", "Rating_Change", "Regulatory", "Other",
+}
+
+
 class CorporateEventsLoader:
-    """Upsert corporate events into fact_corporate_event."""
-
-    # DB check constraint: Earnings | Leadership_Change | M&A | Large_Order |
-    #                       Pledging_Change | Rating_Change | Regulatory | Other
-    EVENT_TYPE_MAP = {
-        "DIVIDEND":  "Earnings",   # Dividend announcements → Earnings context
-        "RESULTS":   "Earnings",   # Quarterly results → Earnings
-        "BONUS":     "Other",
-        "SPLIT":     "Other",
-        "RIGHTS":    "Other",
-        "BUYBACK":   "Other",
-        "AGM":       "Regulatory",
-        "EGM":       "Regulatory",
-        "OTHER":     "Other",
-    }
-
-    # DB constraint: Manual | Rule | NLP
-    CATEGORIZATION_METHOD = "Rule"
+    """Upsert classified corporate events into ``fact_corporate_event``."""
 
     def load(self, df: pd.DataFrame) -> int:
-        """Upsert a classified events DataFrame.
+        """Upsert events. Rows with NULL event_date are skipped.
 
         Returns:
             Number of rows upserted.
@@ -59,37 +55,55 @@ class CorporateEventsLoader:
         rows_upserted = 0
 
         upsert_sql = text("""
-            INSERT INTO fact_corporate_event
-                (symbol, event_date, event_type, significance_score,
-                 event_summary, raw_announcement_text, categorization_method)
-            VALUES
-                (:symbol, :event_date, :event_type, :significance,
-                 :event_summary, :raw_text, :method)
+            INSERT INTO fact_corporate_event (
+                symbol, event_date, event_type, significance_score,
+                event_summary, raw_announcement_text, categorization_method,
+                follow_up_required
+            ) VALUES (
+                :symbol, :event_date, :event_type, :significance,
+                :event_summary, :raw_text, :method, :follow_up
+            )
             ON CONFLICT (symbol, event_date, event_type) DO UPDATE SET
-                significance_score     = EXCLUDED.significance_score,
-                event_summary          = EXCLUDED.event_summary,
-                raw_announcement_text    = EXCLUDED.raw_announcement_text,
-                categorization_method    = EXCLUDED.categorization_method
+                significance_score    = EXCLUDED.significance_score,
+                event_summary         = EXCLUDED.event_summary,
+                raw_announcement_text = EXCLUDED.raw_announcement_text,
+                categorization_method = EXCLUDED.categorization_method,
+                follow_up_required    = EXCLUDED.follow_up_required
         """)
 
         with engine.begin() as conn:
             for _, row in df.iterrows():
                 if pd.isna(row.get("event_date")) or row.get("event_date") is None:
-                    logger.debug("Skipping event with null date: %s / %s", row["symbol"], row.get("event_type"))
+                    logger.debug(
+                        "Skipping event with null date: %s / %s",
+                        row.get("symbol"), row.get("event_type"),
+                    )
                     continue
 
                 event_date = row["event_date"]
                 if hasattr(event_date, "date"):
                     event_date = event_date.date()
 
+                event_type = row.get("event_type", "Other")
+                if event_type not in VALID_EVENT_TYPES:
+                    logger.warning(
+                        "Unknown event_type %r from classifier — coercing to Other",
+                        event_type,
+                    )
+                    event_type = "Other"
+
+                significance = int(row.get("significance_score") or 1)
+                significance = max(1, min(5, significance))
+
                 conn.execute(upsert_sql, {
                     "symbol":        row["symbol"],
                     "event_date":    event_date,
-                    "event_type":    self.EVENT_TYPE_MAP.get(row["event_type"], "Other"),
-                    "significance":  min(5, max(1, int(row["significance"]))),
-                    "event_summary": str(row.get("description", ""))[:500],
-                    "raw_text":      str(row.get("description", ""))[:2000],
-                    "method":        self.CATEGORIZATION_METHOD,
+                    "event_type":    event_type,
+                    "significance":  significance,
+                    "event_summary": str(row.get("event_summary", ""))[:500],
+                    "raw_text":      str(row.get("raw_announcement_text", ""))[:2000],
+                    "method":        row.get("categorization_method", "Rule"),
+                    "follow_up":     bool(row.get("is_negative", False)),
                 })
                 rows_upserted += 1
 

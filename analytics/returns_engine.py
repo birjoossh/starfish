@@ -14,11 +14,17 @@ import logging
 
 import pandas as pd
 
+from analytics.registry import register_engine
 from config.thresholds import get_return_windows
 
 logger = logging.getLogger(__name__)
 
 
+@register_engine(
+    name="returns",
+    inputs=("prices",),
+    outputs=("trade_date", "symbol", "return_1d", "return_1m", "return_3m", "return_1y"),
+)
 def compute_returns(df: pd.DataFrame) -> pd.DataFrame:
     """Compute returns for each symbol at each date.
 

@@ -9,8 +9,15 @@ import logging
 import pandas as pd
 import numpy as np
 
+from analytics.registry import register_engine
+
 logger = logging.getLogger(__name__)
 
+@register_engine(
+    name="trend_stability",
+    inputs=("prices", "returns"),
+    outputs=("trade_date", "symbol", "direction_consistency_20d", "intraday_reversal_count_20d"),
+)
 def compute_trend_stability(prices_df: pd.DataFrame, returns_df: pd.DataFrame) -> pd.DataFrame:
     """Compute trend stability metrics.
     

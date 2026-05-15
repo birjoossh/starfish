@@ -16,11 +16,20 @@ import pandas as pd
 import numpy as np
 from scipy.stats import linregress
 
+from analytics.registry import register_engine
 from config.thresholds import get_volume_thresholds
 
 logger = logging.getLogger(__name__)
 
 
+@register_engine(
+    name="volume",
+    inputs=("prices",),
+    outputs=(
+        "trade_date", "symbol", "vol_ratio_1d", "vol_ratio_5d", "vol_ratio_20d",
+        "avg_volume_20d", "volume_trend_3m",
+    ),
+)
 def compute_volume(df: pd.DataFrame) -> pd.DataFrame:
     """Compute volume metrics for each symbol at each date.
 

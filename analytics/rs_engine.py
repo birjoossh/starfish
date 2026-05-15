@@ -10,10 +10,17 @@ from __future__ import annotations
 
 import logging
 import pandas as pd
+
+from analytics.registry import register_engine
 from config.thresholds import get_return_windows
 
 logger = logging.getLogger(__name__)
 
+@register_engine(
+    name="rs",
+    inputs=("returns", "index"),
+    outputs=("trade_date", "symbol", "rs_vs_nifty_1m", "rs_vs_nifty_3m", "rs_vs_nifty_1y"),
+)
 def compute_rs(returns_df: pd.DataFrame, index_prices_df: pd.DataFrame) -> pd.DataFrame:
     """Compute Relative Strength (RS) vs Nifty 50.
     
