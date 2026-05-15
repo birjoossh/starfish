@@ -16,7 +16,7 @@ Everything below must be completed before we move to Phase 2.
 
 Single source of truth for the status of every TODO-### in this file. Update on completion of each item. The per-section detail blocks below stay as the spec / why / depends-on reference; this table is the at-a-glance roll-up.
 
-Last updated: **2026-05-13** (TODO-106 closed on `feature/todo-106-index-prices`, commit `0a4bc43`).
+Last updated: **2026-05-15** (TODO-119 confirmed done — the `fact_corporate_event` table already lives in `sql/schema.sql:108-127` from Phase E work and matches spec Table 6 column-for-column; TODO-120 dropped to 🟨 Partial — existing stub at `ingestion/corporate_events_ingestor.py` emits the corporate-action taxonomy and the loader collapses every row to Earnings/Regulatory/Other, so the spec's qualitative event types are never produced). Closure happens on `feature/todo-119-fact-corporate-event`.
 
 **Sort order:** **Open / Partial items are sorted by signal-value priority** — what each TODO unlocks for the investment-decision flow on the dashboard. The reasoning per rank is in the "Why this rank" column. Done items are listed below the open set in numeric ID order, since their relative ranking no longer affects the next-action decision.
 
@@ -26,8 +26,7 @@ Last updated: **2026-05-13** (TODO-106 closed on `feature/todo-106-index-prices`
 |---|---|---|---|---|---|
 | ⭐ 1 | 122 | `mart_stoc
 k_signals` (full spec schema) | M1.5 | 🟨 Partial | **The central signals table.** Fixing `iss_score` (0.0 today → 7-factor composite), `signal_category` (wrong "Bullish/Bearish" labels → spec "ACC/MOM/EVT/Neutral"), `volume_trend_3m` (ratio → regression), and `direction_consistency_20d` unlocks the ISS gauge (§02), every signal pill in §02/§04/§05/§06, MOM tiers (§06), Triple Confirmation, drawdown tags. RS-1M now lit by TODO-106 — RS-3M / RS-1Y still zero until TODO-127 extends history beyond 63 / 252 trading days. |
-| ⭐ 2 | 119 | Create `fact_corporate_event` table | M1.4 | ⬜ Open | Schema gate for event-driven signals. Without this `event_flag`, EVT signal_category, "Needs Event Review" drawdown tag, "Event-Driven Pop" momentum tag are all blocked. §08 Events Tracker retokenize is blocked. |
-| ⭐ 3 | 120 | `ingest_corporate_events.py` + keyword classifier | M1.4 | ⬜ Open | Populates 119. Together 119 + 120 unlock the entire event-driven signal class plus ISS Factor 5 (event significance). |
+| ⭐ 2 | 120 | `ingest_corporate_events.py` + spec-taxonomy keyword classifier | M1.4 | 🟨 Partial | Existing stub at `ingestion/corporate_events_ingestor.py` reuses `purpose_parser` and emits the corporate-action taxonomy (DIVIDEND/BONUS/SPLIT/…). `corporate_events_loader.py:33` then hard-maps those onto `fact_corporate_event`'s enum, collapsing every row into Earnings/Regulatory/Other. The spec's qualitative event types — Leadership_Change, M&A, Large_Order, Pledging_Change, Rating_Change — are never produced. Needs a real announcement-text keyword classifier + significance scoring before EVT signal_category, ISS Factor 5, and §08 retokenize can light up. |
 | ⭐ 4 | 103 | MTO delivery data ingestion (`delivery_qty/pct`) | M1.1 | ⬜ Open | Delivery % distinguishes real conviction from intraday churn. Unblocks VA-6 / VA-7 volume rules, delivery column in §07 spike tables, ISS Factor 2 delivery component, "Volume-Confirmed" momentum tag quality. |
 | ⭐ 5 | 123 | `mart_volume_anomaly` table | M1.5 | ⬜ Open | Spec VA-1…VA-7 rules pre-computed with consistent thresholds + event-proximity check (depends on 119). §07 currently approximates client-side from `vol_ratio_1d` — works but weaker than spec rules. |
 | 6 | 116 | Create `fact_corporate_action` table | M1.4 | ⬜ Open | Dividend / split / bonus drive corporate-action-adjusted prices (impacts every return and drawdown computation around ex-dates) + dividend-yield component for Rahul's fundamental view. Required for proper Trend Workbench overlays on event dates. |
@@ -64,6 +63,7 @@ k_signals` (full spec schema) | M1.5 | 🟨 Partial | **The central signals tabl
 | 108 | Create `fact_52wk` table | M1.2 | ✅ Done | — |
 | 109 | `compute_52wk.py` rolling 252-day | M1.2 | ✅ Done | — |
 | 110 | Idempotent upsert for `fact_52wk` | M1.2 | ✅ Done | — |
+| 119 | Create `fact_corporate_event` table | M1.4 | ✅ Done | Table + 3 indexes (incl. unique (symbol, event_date, event_type) for idempotent upsert) already in `sql/schema.sql:108-127`. Originally landed under the Phase E corporate-events work; confirmed against spec Table 6 line-by-line on 2026-05-15. |
 
 **Status legend:** ✅ Done · 🟨 Partial · ⬜ Open · 🚫 Blocked (explicit hard block — call out in Notes).
 
@@ -119,7 +119,7 @@ Tracked per project rule (`.claude/CLAUDE.md` → "Maintain a consistent todo li
 | 2026-05-10 | Same configurability for Active momentum and RS chart | **Done** | Min ISS slider on Active momentum; Top N slider on RS chart |
 | 2026-05-10 | Sector Aggregation row click → stocks in sector with Primary Scanner cols | **Done** | `dashboard/app.py` — `on_select="rerun"` + `_render_scanner_drilldown` |
 | 2026-05-10 | Treemap tile click → stock/sector details with Primary Scanner cols | **Done** | Same drill-down helper, dispatched on plotly_chart selection |
-| 2026-05-11 | Consolidate dashboard to single page · 8 sections · Streamlit | **Done** | Phases 0–9 all complete on `feature/dashboard-consolidation` (latest commit `a719419`). Design locked at `design/mock_consolidated.html`. Implementation plan: `docs/dashboard_consolidation_plan.md`. §03 Trend Workbench live with multi-day price/volume/ISS analysis. §05/§06/§07 retokenized with primitives + row-click drill-in. §08 Events Tracker still wraps legacy renderer pending TODO-119/120. |
+| 2026-05-11 | Consolidate dashboard to single page · 8 sections · Streamlit | **Done** | Phases 0–9 all complete on `feature/dashboard-consolidation` (latest commit `a719419`). Design locked at `design/mock_consolidated.html`. Implementation plan: `docs/dashboard_consolidation_plan.md`. §03 Trend Workbench live with multi-day price/volume/ISS analysis. §05/§06/§07 retokenized with primitives + row-click drill-in. §08 Events Tracker still wraps legacy renderer pending TODO-120 rewrite (TODO-119 table is done). |
 
 ---
 
@@ -146,7 +146,7 @@ Date: 2026-04-10. Covers everything built so far.
 | NSE index prices (M2.3) | **Missing** | rs_vs_nifty_* hardcoded to 0.0. ISS Factor 2 blocked |
 | dim_nifty50_constituent (M1.3) | **Missing** | Table exists but empty. No point-in-time membership |
 | fact_corporate_action (M1.4) | **Missing** | Table exists but empty |
-| fact_corporate_event (M1.4) | **Missing** | Table exists but empty |
+| fact_corporate_event (M1.4) | **Done** | `sql/schema.sql:108-127` — table + 3 indexes (idempotency via unique (symbol, event_date, event_type)). Empty until TODO-120 is rewritten with the spec event taxonomy. |
 | purpose_parser (M1.4) | **Missing** | Not built |
 | Backfill orchestrator (M1.5) | **Missing** | daily_run.py exists but no bulk 5-year loader |
 | Alembic migrations (M1.5) | **Missing** | Manual DDL only |
