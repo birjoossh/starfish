@@ -16,7 +16,7 @@ Everything below must be completed before we move to Phase 2.
 
 Single source of truth for the status of every TODO-### in this file. Update on completion of each item. The per-section detail blocks below stay as the spec / why / depends-on reference; this table is the at-a-glance roll-up.
 
-Last updated: **2026-05-15** (TODO-119 confirmed done — the `fact_corporate_event` table already lives in `sql/schema.sql:108-127` from Phase E work and matches spec Table 6 column-for-column; TODO-120 dropped to 🟨 Partial — existing stub at `ingestion/corporate_events_ingestor.py` emits the corporate-action taxonomy and the loader collapses every row to Earnings/Regulatory/Other, so the spec's qualitative event types are never produced). Closure happens on `feature/todo-119-fact-corporate-event`.
+Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: TODO-002, 111, 116, 117, 118, 119, 121 were all silently done already, and three of the five "Cross-cutting spec deviations" (signal_category labels, volume_trend regression, direction_consistency) had been quietly fixed too. Genuinely-remaining wave-1 work is now narrow: **TODO-114** (`is_nifty50_member` utility — verifiably absent), **TODO-NEW** (signal_registry — only the docstring at `analytics/__init__.py` exists; no formal contract), **TODO-120** (rewrite corporate-events ingestor with the spec's qualitative taxonomy), and **two TODO-122 sub-fixes** (iss_score 7-factor composite, rs_vs_nifty_* NULL semantics).
 
 **Sort order:** **Open / Partial items are sorted by signal-value priority** — what each TODO unlocks for the investment-decision flow on the dashboard. The reasoning per rank is in the "Why this rank" column. Done items are listed below the open set in numeric ID order, since their relative ranking no longer affects the next-action decision.
 
@@ -24,29 +24,22 @@ Last updated: **2026-05-15** (TODO-119 confirmed done — the `fact_corporate_ev
 
 | Rank | ID | Title | Milestone | Status | Why this rank for signal value |
 |---|---|---|---|---|---|
-| ⭐ 1 | 122 | `mart_stoc
-k_signals` (full spec schema) | M1.5 | 🟨 Partial | **The central signals table.** Fixing `iss_score` (0.0 today → 7-factor composite), `signal_category` (wrong "Bullish/Bearish" labels → spec "ACC/MOM/EVT/Neutral"), `volume_trend_3m` (ratio → regression), and `direction_consistency_20d` unlocks the ISS gauge (§02), every signal pill in §02/§04/§05/§06, MOM tiers (§06), Triple Confirmation, drawdown tags. RS-1M now lit by TODO-106 — RS-3M / RS-1Y still zero until TODO-127 extends history beyond 63 / 252 trading days. |
-| ⭐ 2 | 120 | `ingest_corporate_events.py` + spec-taxonomy keyword classifier | M1.4 | 🟨 Partial | Existing stub at `ingestion/corporate_events_ingestor.py` reuses `purpose_parser` and emits the corporate-action taxonomy (DIVIDEND/BONUS/SPLIT/…). `corporate_events_loader.py:33` then hard-maps those onto `fact_corporate_event`'s enum, collapsing every row into Earnings/Regulatory/Other. The spec's qualitative event types — Leadership_Change, M&A, Large_Order, Pledging_Change, Rating_Change — are never produced. Needs a real announcement-text keyword classifier + significance scoring before EVT signal_category, ISS Factor 5, and §08 retokenize can light up. |
-| ⭐ 4 | 103 | MTO delivery data ingestion (`delivery_qty/pct`) | M1.1 | ⬜ Open | Delivery % distinguishes real conviction from intraday churn. Unblocks VA-6 / VA-7 volume rules, delivery column in §07 spike tables, ISS Factor 2 delivery component, "Volume-Confirmed" momentum tag quality. |
-| ⭐ 5 | 123 | `mart_volume_anomaly` table | M1.5 | ⬜ Open | Spec VA-1…VA-7 rules pre-computed with consistent thresholds + event-proximity check (depends on 119). §07 currently approximates client-side from `vol_ratio_1d` — works but weaker than spec rules. |
-| 6 | 116 | Create `fact_corporate_action` table | M1.4 | ⬜ Open | Dividend / split / bonus drive corporate-action-adjusted prices (impacts every return and drawdown computation around ex-dates) + dividend-yield component for Rahul's fundamental view. Required for proper Trend Workbench overlays on event dates. |
-| 7 | 117 | `purpose_parser.py` regex library | M1.4 | ⬜ Open | Required for 116/118 to extract structured ratio + amount from NSE's free-text. Without it, corporate-action data is just text — not usable for signals. |
-| 8 | 118 | `ingest_corporate_actions.py` | M1.4 | ⬜ Open | Populates 116 once 117 is in. |
-| 9 | 121 | Unit tests for `purpose_parser` | M1.4 | ⬜ Open | Quality gate on 117 — a silent mis-parse corrupts every downstream computation. Low signal value on its own but a P0 risk-mitigation for 6–8. |
-| 10 | 111 | Create `dim_nifty50_constituent` table | M1.3 | ⬜ Open | Today every view filters universe via `dim_stock.nifty50_member` (snapshot). Daily signals on CURRENT members are fine; HISTORICAL accuracy (Trend Workbench multi-year, signal suppression for newly-added names <30d) needs point-in-time membership. |
-| 11 | 112 | Seed `nifty50_history.csv` (5-year reconstitution) | M1.3 | ⬜ Open | Populates 111. Manual compile from NSE circulars. |
-| 12 | 114 | `is_nifty50_member(symbol, as_of_date)` utility | M1.3 | ⬜ Open | Called by every signal computation that does back-testing or trend look-back. Cheap once 111+112 land. |
-| 13 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | ⬜ Open | Semi-annual operational task (March/September). Doesn't add signals — keeps membership current. |
-| 14 | 115 | Seed-CSV validation before insert | M1.3 | ⬜ Open | Quality gate for 112. Low signal value, P1 reliability. |
-| 15 | 127 | Backfill orchestrator (5-year, FK-ordered) | M1.5 | ⬜ Open | More history → longer-period ISS factors (e.g. 3Y return component), longer Trend Workbench periods, better statistical baselines. **Now also gates RS-3M and RS-1Y** post-TODO-106: index ingestion is wired and seeded but the analytics windows can't compute without ≥63 / 252 days of bhavcopy depth. |
-| 16 | 105 | Corrupted-download validation (checksum / row-count) | M1.1 | ⬜ Open | Silent-corruption protection — no new signal but prevents signal degradation from bad data. P1 reliability. |
-| 17 | 128 | Backfill validation report (gaps, 52WK cross-check) | M1.5 | ⬜ Open | Detects gaps that would silently degrade signals. Paired with 127. |
-| 18 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed of re-runs. No signal value. |
-| 19 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames (e.g. INFRATEL → INDUSINDBK). Rare. |
-| 20 | 124 | Alembic migrations for all tables | M1.5 | ⬜ Open | Schema-management infra. Critical operationally but contributes zero signal value directly. |
-| 21 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
-| 22 | 002 | `GET /health` endpoint | Cross-cutting | ⬜ Open | DX. No signal value. |
-| 23 | NEW | Composable analytics-engine contract | Cross-cutting | ⬜ Open | Refactor pattern. Spec §13.3. Doesn't add a signal — makes adding future signals cheaper. |
+| ⭐ 1 | 122 | `mart_stock_signals` — remaining sub-fixes (`iss_score`, `rs_vs_nifty_*` NULL semantics) | M1.5 | 🟨 Partial | **The central signals table.** `signal_category`, `volume_trend_3m` (regression at `volume_engine.py:70-87` with R²≥0.30), and `direction_consistency_20d` (`trend_stability_engine.py:63`) are already fixed. Still open: the 7-factor 0-100 composite `iss_score` (currently hardcoded 0.0 at `compute_signals.py:215`) and the `rs_vs_nifty_*` NULL-vs-0.0 semantics. RS-1M wired by TODO-106 — RS-3M / RS-1Y still zero until TODO-127 extends history. |
+| ⭐ 2 | 120 | `ingest_corporate_events.py` — spec-taxonomy keyword classifier | M1.4 | 🟨 Partial | Existing stub at `ingestion/corporate_events_ingestor.py` reuses `purpose_parser` and emits the corporate-action taxonomy (DIVIDEND/BONUS/SPLIT/…). `corporate_events_loader.py:33` then hard-maps those onto `fact_corporate_event`'s enum, collapsing every row into Earnings/Regulatory/Other. The spec's qualitative event types — Leadership_Change, M&A, Large_Order, Pledging_Change, Rating_Change — are never produced. Needs a real announcement-text keyword classifier + significance scoring before EVT signal_category, ISS Factor 5, and §08 retokenize can light up. |
+| ⭐ 3 | 123 | `mart_volume_anomaly` table | M1.5 | ⬜ Open | Spec VA-1…VA-7 rules pre-computed with consistent thresholds + event-proximity check. §07 currently approximates client-side from `vol_ratio_1d` — works but weaker than spec rules. |
+| 4 | 103 | MTO delivery data ingestion (`delivery_qty/pct`) | M1.1 | 🟨 In-progress (off-branch) | Delivery % distinguishes real conviction from intraday churn. **Implementation lives on `feature/wave-1-mto-validation` commit `5808633`** — not yet merged to main. Unblocks VA-6 / VA-7, §07 delivery column, ISS Factor 2 delivery component. |
+| 5 | 105 | Corrupted-download validation (checksum / row-count) | M1.1 | 🟨 In-progress (off-branch) | Same branch as TODO-103 (`5808633`). Pre-parse size + row + reference-ratio gates land in `ingestion/download_validator.py`. |
+| 6 | 114 | `is_nifty50_member(symbol, as_of_date)` utility | M1.3 | ⬜ Open | Verifiably absent from `api/`, `analytics/`, `services/`, `ingestion/` (`grep -rn is_nifty50_member` returns only spec + TODOS references). Cheap to write once needed for point-in-time back-testing. |
+| 7 | NEW | Composable analytics-engine contract / signal_registry | Cross-cutting | 🟨 Partial | `analytics/__init__.py` documents the pattern but no formal registry decorator or auto-discovery. Engines (`returns_engine`, `volume_engine`, `rs_engine`, `trend_stability_engine`, …) are wired by name in `compute_signals.py`. Adding a new signal still means editing the orchestrator. |
+| 8 | 112 | Seed `nifty50_history.csv` (5-year reconstitution) | M1.3 | ⬜ Open | Today the constituent loader writes only the current snapshot (`ind_nifty50list.csv`). A real 5-year history compiled from NSE circulars unlocks point-in-time membership queries. |
+| 9 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. |
+| 10 | 115 | Seed-CSV validation before insert | M1.3 | ⬜ Open | Quality gate for 112. P1 reliability. |
+| 11 | 127 | Backfill orchestrator (5-year, FK-ordered) | M1.5 | ⬜ Open | More history → longer-period ISS factors, longer Trend Workbench periods, better statistical baselines. **Gates RS-3M and RS-1Y** post-TODO-106. |
+| 12 | 128 | Backfill validation report (gaps, 52WK cross-check) | M1.5 | ⬜ Open | Paired with 127. |
+| 13 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
+| 14 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
+| 15 | 124 | Alembic migrations for all tables | M1.5 | ⬜ Open | Schema-management infra. Zero direct signal value. |
+| 16 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
 
 ### Closed items (numeric ID order)
 
@@ -64,14 +57,24 @@ k_signals` (full spec schema) | M1.5 | 🟨 Partial | **The central signals tabl
 | 109 | `compute_52wk.py` rolling 252-day | M1.2 | ✅ Done | — |
 | 110 | Idempotent upsert for `fact_52wk` | M1.2 | ✅ Done | — |
 | 119 | Create `fact_corporate_event` table | M1.4 | ✅ Done | Table + 3 indexes (incl. unique (symbol, event_date, event_type) for idempotent upsert) already in `sql/schema.sql:108-127`. Originally landed under the Phase E corporate-events work; confirmed against spec Table 6 line-by-line on 2026-05-15. |
+| 002 | `GET /health` endpoint | Cross-cutting | ✅ Done | `api/main.py:104` — checks DB connectivity, returns table row counts. Closed retroactively in the 2026-05-15 audit. |
+| 111 | Create `dim_nifty50_constituent` table | M1.3 | ✅ Done | `sql/schema.sql:28-40` — composite PK (symbol, effective_from), FK to dim_stock, change_type CHECK constraint matches spec Table 4. Closed retroactively 2026-05-15. |
+| 116 | Create `fact_corporate_action` table | M1.4 | ✅ Done | `sql/schema.sql:87-104` — full 12-column spec match including unique (symbol, action_type, ex_date) for idempotent dedup. Closed retroactively 2026-05-15. |
+| 117 | `purpose_parser.py` regex library | M1.4 | ✅ Done | `ingestion/purpose_parser.py` — full ParsedPurpose dataclass + 9-event-type taxonomy + `event_significance()` 1-5 scorer matching spec. Closed retroactively 2026-05-15. |
+| 118 | `ingest_corporate_actions.py` | M1.4 | ✅ Done | `ingestion/corporate_actions_parser.py` + `ingestion/corporate_actions_loader.py` — CorporateActionsLoader writes via INSERT … ON CONFLICT (symbol, ex_date, action_type) DO UPDATE. Closed retroactively 2026-05-15. |
+| 121 | Unit tests for `purpose_parser` | M1.4 | ✅ Done | `tests/test_purpose_parser.py` — class-based coverage of dividend/bonus/split/rights/buyback/AGM/EGM/results/other across normal + edge cases. Closed retroactively 2026-05-15. |
+| 122-a | `signal_category` ACC/MOM/EVT/Neutral labels | M1.5 | ✅ Done | `analytics/compute_signals.py:298` + `analytics/signal_classifier.py:50-59` — emit "Accumulation"/"Momentum"/"EventDriven"/"Neutral" per spec §6.2. Closed retroactively 2026-05-15. |
+| 122-b | `volume_trend_3m` linear regression on 63d (R²≥0.30) | M1.5 | ✅ Done | `analytics/volume_engine.py:70-87` — `scipy.stats.linregress` over 63-day rolling window with `r_squared ≥ 0.30` gate; emits Expanding/Contracting/Mixed labels. Closed retroactively 2026-05-15. |
+| 122-c | `direction_consistency_20d` (count up-days / 20) | M1.5 | ✅ Done | `analytics/trend_stability_engine.py:63` — also exposes `intraday_reversal_count_20d` for the same penalty term. Closed retroactively 2026-05-15. |
 
 **Status legend:** ✅ Done · 🟨 Partial · ⬜ Open · 🚫 Blocked (explicit hard block — call out in Notes).
 
-**Bracketed reading of the ladder:**
-- **Ranks 1–5 (⭐):** Each one materially upgrades the signal quality of an existing dashboard section. Pick from here for the next work item.
-- **Ranks 6–9:** Corporate-actions chain — adjacent signal value (dividend yield, ex-date adjustments) but lower frequency than the event chain (2–3).
-- **Ranks 10–14:** Universe correctness — matters for back-testing and historical Trend Workbench, doesn't change today's daily signals.
-- **Ranks 15–23:** Reliability, ops, and infra. Necessary for Phase 1 closure but no incremental signal value. Rank 15 (TODO-127) is the immediate post-TODO-106 unlock: extending bhavcopy depth lights up the rs_vs_nifty_3m and rs_vs_nifty_1y columns that the wiring already supports.
+**Bracketed reading of the ladder (post 2026-05-15 audit):**
+- **Ranks 1–3 (⭐):** Highest signal-value remaining work. Each materially upgrades a dashboard section.
+- **Ranks 4–5:** TODO-103 / TODO-105 — already implemented on `feature/wave-1-mto-validation` (commit `5808633`); listed here for accounting until that branch merges.
+- **Ranks 6–7:** Plumbing — `is_nifty50_member` utility and the signal_registry contract refactor. Small but high-leverage.
+- **Ranks 8–10:** Universe correctness — matters for back-testing and historical Trend Workbench.
+- **Ranks 11–16:** Reliability, ops, and infra. Necessary for Phase 1 closure but no incremental signal value. Rank 11 (TODO-127) is still the immediate post-TODO-106 unlock for RS-3M / RS-1Y.
 
 **Maintenance rules:**
 1. Closing an item → update Status to ✅ and append the closing commit SHA (or PR #) to Notes.
@@ -79,15 +82,15 @@ k_signals` (full spec schema) | M1.5 | 🟨 Partial | **The central signals tabl
 3. Spec-deviation items (the 5 "Must Fix" entries in the audit) flow into TODO-122 Notes — they're not separate IDs.
 4. The "Spec Alignment Audit" tables below are descriptive (per-area %). The Master Status table is authoritative for TODO-### status; resolve any disagreement here.
 
-### Cross-cutting spec deviations still open (rolled into TODO-122 Notes)
+### Cross-cutting spec deviations (post 2026-05-15 audit)
 
-| # | Deviation | TODO covering it |
-|---|---|---|
-| 1 | `signal_category` uses Bullish / Bearish (wrong labels) | 122 |
-| 2 | `rs_vs_nifty_*` = 0.0 instead of NULL | 122 + 106 |
-| 3 | `iss_score` = 0.0 (the entire ISS scoring function) | 122 |
-| 4 | `volume_trend_3m` uses ratio threshold, not regression | 122 |
-| 5 | `direction_consistency_20d` not computed | 122 |
+| # | Deviation | Status | TODO covering it |
+|---|---|---|---|
+| 1 | `signal_category` uses Bullish / Bearish (wrong labels) | ✅ Fixed — `compute_signals.py:298` emits "Accumulation"/"Momentum"/"EventDriven"/"Neutral" | 122-a |
+| 2 | `rs_vs_nifty_*` = 0.0 instead of NULL | ⬜ Open | 122 + 106 |
+| 3 | `iss_score` = 0.0 (the entire ISS scoring function) | ⬜ Open — `compute_signals.py:215` still hardcodes 0.0 even though `analytics/iss_scorer.py` exists | 122 |
+| 4 | `volume_trend_3m` uses ratio threshold, not regression | ✅ Fixed — `volume_engine.py:70-87` uses `linregress` with R²≥0.30 | 122-b |
+| 5 | `direction_consistency_20d` not computed | ✅ Fixed — `trend_stability_engine.py:63` | 122-c |
 
 ### Phase 5 — Alerting (not yet broken into TODO-###s)
 
