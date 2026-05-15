@@ -27,6 +27,7 @@ from pathlib import Path
 from config.settings import settings
 from ingestion.bhavcopy_loader import BhavcopyLoader
 from ingestion.bhavcopy_parser import BhavcopyParseError, BhavcopyParser
+from ingestion.download_validator import validate_bhavcopy_size, DownloadValidationError
 from ingestion.local_source import LocalSource
 from ingestion.nse_client import CircuitBreakerOpen, NSEClient
 
@@ -69,6 +70,38 @@ def _ingest_index_price(trade_date: date) -> int:
     return orch.parse_and_load_index_csv(path, trade_date)
 
 
+def _ingest_mto(trade_date: date, local_dir: Path | None) -> dict | None:
+    """Run the MTO T+1 delivery update for ``trade_date``.
+
+    Returns ``None`` if no MTO file is available locally and the NSE
+    download fails (treated as soft-fail — bhavcopy still loaded fine).
+    """
+    from ingestion.mto_parser import MTOParser, MTOParseError
+    from ingestion.mto_loader import MTOLoader
+
+    mto_path: Path | None = None
+    if local_dir is not None:
+        candidate = Path(local_dir) / f"MTO_{trade_date.strftime('%d%m%Y')}.DAT"
+        if candidate.exists():
+            mto_path = candidate
+
+    if mto_path is None:
+        try:
+            client = NSEClient()
+            mto_path = client.download_mto(trade_date)
+        except (CircuitBreakerOpen, Exception) as e:
+            logger.warning(f"MTO unavailable for {trade_date}: {e}")
+            return None
+
+    try:
+        df = MTOParser().parse(mto_path, trade_date=trade_date)
+    except MTOParseError as e:
+        logger.warning(f"MTO parse failed for {trade_date}: {e}")
+        return None
+
+    return MTOLoader().load(df, source_file=mto_path.name)
+
+
 def ingest_single_date(
     trade_date: date,
     local_dir: Path | None = None,
@@ -76,15 +109,18 @@ def ingest_single_date(
     corporate_events_csv: Path | None = None,
     compute_signals_flag: bool = False,
     skip_index: bool = False,
+    skip_mto: bool = False,
 ) -> dict:
-    """Ingest bhavcopy + Nifty 50 index price for a single date.
+    """Ingest bhavcopy + Nifty 50 index + MTO delivery for a single date.
 
     Tries NSE download first, falls back to local source if circuit breaker trips.
     Index ingestion (TODO-106) runs after bhavcopy unless ``skip_index=True``.
+    MTO delivery update (TODO-103) runs after bhavcopy unless ``skip_mto=True``;
+    safe to skip when running same-day before NSE publishes the MTO file.
 
     Returns:
-        Dict with ingestion stats. Adds ``index_rows`` (0 or 1) when index
-        ingestion runs.
+        Dict with ingestion stats. Adds ``index_rows`` and ``mto_loaded``
+        keys for the optional steps.
     """
     parser = BhavcopyParser()
     loader = BhavcopyLoader()
@@ -126,6 +162,13 @@ def ingest_single_date(
     if csv_path is None:
         return {"status": "failed", "error": "No data source available"}
 
+    # Validate file size and row count (TODO-105)
+    try:
+        validate_bhavcopy_size(csv_path)
+    except DownloadValidationError as e:
+        logger.error(f"Download validation failed: {e}")
+        return {"status": "failed", "error": f"Corrupted download: {e}"}
+
     # Parse
     try:
         df = parser.parse(csv_path, trade_date=trade_date, source_file=source_file)
@@ -146,6 +189,17 @@ def ingest_single_date(
         except Exception as e:
             logger.warning(f"Index ingestion failed for {trade_date}: {e}")
             stats["index_rows"] = 0
+
+    # MTO delivery update — T+1 patch for bhavcopy delivery_qty/delivery_pct.
+    if skip_mto:
+        stats["mto_loaded"] = None
+    else:
+        try:
+            mto_result = _ingest_mto(trade_date, local_dir)
+            stats["mto_loaded"] = mto_result
+        except Exception as e:
+            logger.warning(f"MTO ingestion failed for {trade_date}: {e}")
+            stats["mto_loaded"] = None
 
     if corporate_actions_csv is not None and corporate_actions_csv.exists():
         from ingestion.corporate_actions_parser import CorporateActionsParser
@@ -183,6 +237,7 @@ def backfill(
     corporate_events_csv: Path | None = None,
     compute_signals_flag: bool = False,
     skip_index: bool = False,
+    skip_mto: bool = False,
 ) -> list[dict]:
     """Backfill a date range.
 
@@ -201,6 +256,7 @@ def backfill(
                 corporate_events_csv=corporate_events_csv,
                 compute_signals_flag=compute_signals_flag,
                 skip_index=skip_index,
+                skip_mto=skip_mto,
             )
             results.append(stats)
             logger.info(f"[{current}] {stats['status']}: {stats.get('rows_inserted', 0)} rows")
@@ -238,6 +294,11 @@ def main():
         action="store_true",
         help="Skip the Nifty 50 index-price ingestion step (TODO-106)",
     )
+    parser.add_argument(
+        "--skip-mto",
+        action="store_true",
+        help="Skip the MTO delivery update (TODO-103). Safe for same‑day runs before NSE publishes MTO.",
+    )
 
     args = parser.parse_args()
     local_dir = Path(args.local) if args.local else None
@@ -245,6 +306,7 @@ def main():
     corp_ev = Path(args.corporate_events) if args.corporate_events else None
     do_signals = bool(args.compute_signals)
     skip_index = bool(args.skip_index)
+    skip_mto = bool(args.skip_mto)
 
     if args.date:
         trade_date = date.fromisoformat(args.date)
@@ -255,6 +317,7 @@ def main():
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
             skip_index=skip_index,
+            skip_mto=skip_mto,
         )
         print(f"Result: {stats}")
 
@@ -269,6 +332,7 @@ def main():
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
             skip_index=skip_index,
+            skip_mto=skip_mto,
         )
 
     elif args.start and args.end:
@@ -282,6 +346,7 @@ def main():
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
             skip_index=skip_index,
+            skip_mto=skip_mto,
         )
 
     else:
@@ -293,6 +358,7 @@ def main():
             corporate_events_csv=corp_ev,
             compute_signals_flag=do_signals,
             skip_index=skip_index,
+            skip_mto=skip_mto,
         )
         print(f"Result: {stats}")
 

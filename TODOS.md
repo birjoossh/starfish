@@ -52,6 +52,8 @@ Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: T
 | 102 | `dim_stock` columns (10) align with spec | M1.1 | ✅ Done | — |
 | 104 | Ingestion-log table | M1.1 | ✅ Done | — |
 | 106 | NSE index prices ingestion + RS-vs-Nifty overlay | M1.1 (parallel) | ✅ Done | `0a4bc43` — daily_run wiring + /trend RS overlay + 8 unit tests. RS-1M lit (2538/2657 rows non-zero); RS-3M / RS-1Y deferred to TODO-127. |
+| 103 | MTO delivery data ingestion (`delivery_qty/pct`) | M1.1 | ✅ Done | — |
+| 105 | Corrupted-download validation (checksum / row-count) | M1.1 | ✅ Done | — |
 | 107 | `config.yaml` thresholds | M1.1 | ✅ Done | — |
 | 108 | Create `fact_52wk` table | M1.2 | ✅ Done | — |
 | 109 | `compute_52wk.py` rolling 252-day | M1.2 | ✅ Done | — |
@@ -145,7 +147,7 @@ Date: 2026-04-10. Covers everything built so far.
 | Rate limiting | **Done** | 2s min, exponential backoff, circuit breaker |
 | Local file fallback | **Done** | `LocalSource` with recursive search |
 | CSV header validation | **Done** | Raises clear error listing missing columns |
-| MTO delivery data (M1.1) | **Missing** | delivery_qty/pct stay NULL. VA-6/VA-7 rules can't fire |
+| MTO delivery data (M1.1) | **Done** | Parser + loader + NSEClient + daily_run wiring complete. delivery_qty/pct now populate via T+1 MTO file. |
 | NSE index prices (M2.3) | **Missing** | rs_vs_nifty_* hardcoded to 0.0. ISS Factor 2 blocked |
 | dim_nifty50_constituent (M1.3) | **Missing** | Table exists but empty. No point-in-time membership |
 | fact_corporate_action (M1.4) | **Missing** | Table exists but empty |
@@ -154,7 +156,7 @@ Date: 2026-04-10. Covers everything built so far.
 | Backfill orchestrator (M1.5) | **Missing** | daily_run.py exists but no bulk 5-year loader |
 | Alembic migrations (M1.5) | **Missing** | Manual DDL only |
 | symbol_alias loader | **Missing** | Table exists in schema but no loader |
-| Download validation | **Missing** | Corrupt downloads enter pipeline silently |
+| Download validation | **Done** | `validate_bhavcopy_size` integrated into daily_run; rejects truncated files before parsing. |
 
 ### Phase 2: Core Analytics Engine — ~40% done
 
