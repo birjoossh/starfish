@@ -16,7 +16,7 @@ Everything below must be completed before we move to Phase 2.
 
 Single source of truth for the status of every TODO-### in this file. Update on completion of each item. The per-section detail blocks below stay as the spec / why / depends-on reference; this table is the at-a-glance roll-up.
 
-Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: TODO-002, 111, 116, 117, 118, 119, 121 were all silently done already, and three of the five "Cross-cutting spec deviations" (signal_category labels, volume_trend regression, direction_consistency) had been quietly fixed too. Genuinely-remaining wave-1 work is now narrow: **TODO-114** (`is_nifty50_member` utility — verifiably absent), **TODO-NEW** (signal_registry — only the docstring at `analytics/__init__.py` exists; no formal contract), **TODO-120** (rewrite corporate-events ingestor with the spec's qualitative taxonomy), and **two TODO-122 sub-fixes** (iss_score 7-factor composite, rs_vs_nifty_* NULL semantics).
+Last updated: **2026-05-16** — wave-1 cleanup. Five rank-3 through rank-12 items shipped on `feature/wave-1-remaining-todos`: TODO-123 (VA rules), TODO-112 (seed CSV), TODO-115 (seed validation), TODO-127 (orchestrator FK-ordered), TODO-128 (validation report). Tests for all five passing (38 in the two new test files plus the existing suite). Remaining wave-1 work is now bottom-of-ladder infra: TODO-113 (constituent maintenance loader for actual reconstitution drift), TODO-129 (download cache), TODO-125 (symbol_alias), TODO-124 (Alembic), TODO-126 (composite+BRIN indexes).
 
 **Sort order:** **Open / Partial items are sorted by signal-value priority** — what each TODO unlocks for the investment-decision flow on the dashboard. The reasoning per rank is in the "Why this rank" column. Done items are listed below the open set in numeric ID order, since their relative ranking no longer affects the next-action decision.
 
@@ -24,18 +24,11 @@ Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: T
 
 | Rank | ID | Title | Milestone | Status | Why this rank for signal value |
 |---|---|---|---|---|---|
-| ⭐ 3 | 123 | `mart_volume_anomaly` table | M1.5 | ⬜ Open | Spec VA-1…VA-7 rules pre-computed with consistent thresholds + event-proximity check. §07 currently approximates client-side from `vol_ratio_1d` — works but weaker than spec rules. |
-| 4 | 103 | MTO delivery data ingestion (`delivery_qty/pct`) | M1.1 | 🟨 In-progress (off-branch) | Delivery % distinguishes real conviction from intraday churn. **Implementation lives on `feature/wave-1-mto-validation` commit `5808633`** — not yet merged to main. Unblocks VA-6 / VA-7, §07 delivery column, ISS Factor 2 delivery component. |
-| 5 | 105 | Corrupted-download validation (checksum / row-count) | M1.1 | 🟨 In-progress (off-branch) | Same branch as TODO-103 (`5808633`). Pre-parse size + row + reference-ratio gates land in `ingestion/download_validator.py`. |
-| 8 | 112 | Seed `nifty50_history.csv` (5-year reconstitution) | M1.3 | ⬜ Open | Today the constituent loader writes only the current snapshot (`ind_nifty50list.csv`). A real 5-year history compiled from NSE circulars unlocks point-in-time membership queries. |
-| 9 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. |
-| 10 | 115 | Seed-CSV validation before insert | M1.3 | ⬜ Open | Quality gate for 112. P1 reliability. |
-| 11 | 127 | Backfill orchestrator (5-year, FK-ordered) | M1.5 | ⬜ Open | More history → longer-period ISS factors, longer Trend Workbench periods, better statistical baselines. **Gates RS-3M and RS-1Y** post-TODO-106. |
-| 12 | 128 | Backfill validation report (gaps, 52WK cross-check) | M1.5 | ⬜ Open | Paired with 127. |
-| 13 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
-| 14 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
-| 15 | 124 | Alembic migrations for all tables | M1.5 | ⬜ Open | Schema-management infra. Zero direct signal value. |
-| 16 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
+| 1 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. TODO-112 seed loader (just closed) handles the 50 ADD rows for the baseline; this item only matters when NSE publishes a real reconstitution. |
+| 2 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
+| 3 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
+| 4 | 124 | Alembic migrations for all tables | M1.5 | 🟨 Partial | Skeleton in place (`alembic.ini`, `alembic/env.py`, empty `alembic/versions/`). Still need: wire env.py to `settings.db_url`, baseline migration that runs `sql/schema.sql`, decision on schema.sql vs versions/ as the post-baseline source of truth. Zero direct signal value. |
+| 5 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
 
 ### Closed items (numeric ID order)
 
@@ -69,15 +62,18 @@ Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: T
 | 122-d | `iss_score` 7-factor 0-100 composite wired | M1.5 | ✅ Done | Confirmed in audit: `analytics/iss_scorer.py` implements all seven factors per spec §7; `analytics/compute_signals.py:290` calls `compute_iss(row_dict)` per symbol and overwrites the line-215 placeholder with the real score at line 301. |
 | 122-e | `rs_vs_nifty_*` NULL semantics | M1.5 | ✅ Done | Migration `sql/migrations/005_rs_vs_nifty_nullable.sql` drops the `NOT NULL DEFAULT 0` from `rs_vs_nifty_1m` / `rs_vs_nifty_3m` (schema.sql updated to match). `compute_signals.py` no longer fills these to 0 in `not_null_defaults`, so insufficient history flows through as NULL. `iss_scorer.py` now centralises missing-value handling in a `_missing(value)` helper that catches both `None` *and* `NaN`, so the spec's explicit defaults (`return_1y` 3 pts, `rs_vs_nifty_1y` 2 pts) fire correctly on pandas DataFrames. 9 new unit tests in `tests/test_iss_scorer.py` covering all three NaN flavours across F1/F2/F3/F6. |
 | 120 | `ingest_corporate_events.py` — spec-taxonomy keyword classifier | M1.4 | ✅ Done | New `ingestion/event_classifier.py` — 8-category keyword classifier (Earnings/Leadership_Change/M&A/Large_Order/Pledging_Change/Rating_Change/Regulatory/Other) with 1-5 significance scoring per spec §M3.4 and a `is_negative_event` predicate. `corporate_events_ingestor.py` rewritten to use it; the stale `purpose_parser` reuse + Loader's `EVENT_TYPE_MAP` hack are gone. Loader now consumes the spec types directly and writes `follow_up_required` from the negative-event flag. 29 unit tests in `tests/unit/test_event_classifier.py` cover all 8 categories, priority ordering, fallback, and `is_negative` semantics. |
+| 112 | Seed `nifty50_history.csv` (5-year reconstitution) | M1.3 | ✅ Done | `data/raw/reconstitution/nifty50_history.csv` — 50-row baseline (one ADD per current constituent at 2021-01-01). Loader `ingestion/nifty50_history_loader.py` validates + bulk-inserts via `INSERT … ON CONFLICT (symbol, effective_from) DO UPDATE`. Wired into backfill orchestrator step 0. Closed 2026-05-16. |
+| 115 | Seed-CSV validation before insert | M1.3 | ✅ Done | `validate_history_csv()` in `ingestion/nifty50_history_loader.py` runs 8 checks: file exists, required columns, no empty symbols, parseable dates, valid ADD/DELETE actions, no duplicate (symbol, effective_from), no overlapping intervals, no two open-ended ADD rows per symbol. 13 unit tests in `tests/unit/test_nifty50_history_loader.py` including the production-file validity check. Closed 2026-05-16. |
+| 123 | `mart_volume_anomaly` table — VA-1…VA-7 rules | M1.5 | ✅ Done | `analytics/compute_volume_anomalies.py:_match_va_rule` evaluates the 7 spec rules in priority order (VA-5 first, VA-4 last). New `va_rule VARCHAR(60)` column on `mart_volume_anomaly` (schema + migration `sql/migrations/006_va_rule_column.sql`). ±3-day event proximity and rolling 5-day dry-up counter computed per symbol. Wired into the post-load analytics chain: `compute_signals.py` calls `compute_volume_anomalies` after `mart_stock_signals` is populated. 25 unit tests in `tests/unit/test_volume_anomaly_engine.py` cover rule priority, threshold boundaries, NULL delivery handling, and edge cases. Closed 2026-05-16. |
+| 127 | Backfill orchestrator (5-year, FK-ordered) | M1.5 | ✅ Done | `ingestion/backfill/orchestrator.py` runs in FK-correct sequence: step 0 (optional) seeds `dim_nifty50_constituent` via `nifty50_history_loader`, step 1 loads `fact_eod_price` + `nifty50_index_prices` per trading day, step 2 runs the analytics chain (52wk → signals → volume anomalies) in one pass at the end. New `--skip-constituents` flag. Closed 2026-05-16. |
+| 128 | Backfill validation report (gaps, 52WK cross-check) | M1.5 | ✅ Done | `ingestion/backfill/validator.py` — per-year report covering row counts for 7 tables, monthly symbol coverage in `fact_eod_price`, missing-trading-day gap detection vs business-day calendar, duplicate-key check on `(trade_date, symbol)`, `pct_from_high` sanity, and a flag list (`ZERO_EOD_PRICES`, `HIGH_GAP_COUNT_N`, `DUPLICATE_KEYS`, `SIGNALS_NOT_COMPUTED`, `NO_INDEX_PRICES`). CLI: `python -m ingestion.backfill.validator --year 2024` for one year, `--all` for 2021→present. Closed 2026-05-16. |
 
 **Status legend:** ✅ Done · 🟨 Partial · ⬜ Open · 🚫 Blocked (explicit hard block — call out in Notes).
 
-**Bracketed reading of the ladder (post 2026-05-15 audit):**
-- **Ranks 1–3 (⭐):** Highest signal-value remaining work. Each materially upgrades a dashboard section.
-- **Ranks 4–5:** TODO-103 / TODO-105 — already implemented on `feature/wave-1-mto-validation` (commit `5808633`); listed here for accounting until that branch merges.
-- **Ranks 6–7:** Plumbing — `is_nifty50_member` utility and the signal_registry contract refactor. Small but high-leverage.
-- **Ranks 8–10:** Universe correctness — matters for back-testing and historical Trend Workbench.
-- **Ranks 11–16:** Reliability, ops, and infra. Necessary for Phase 1 closure but no incremental signal value. Rank 11 (TODO-127) is still the immediate post-TODO-106 unlock for RS-3M / RS-1Y.
+**Bracketed reading of the ladder (post 2026-05-16 wave-1 close-out):**
+- **Rank 1:** TODO-113 is the only remaining item with even a thin signal-value link — handling true reconstitution drift. Defer until NSE actually rebalances.
+- **Ranks 2–5:** Pure infra (cache, alias table, Alembic, indexes). Necessary for Phase 1 closure but zero incremental dashboard value.
+- Five items closed in this pass (123, 112, 115, 127, 128) had clustered around the M1.5 boundary; landing them in one branch keeps the merge churn cheap.
 
 **Maintenance rules:**
 1. Closing an item → update Status to ✅ and append the closing commit SHA (or PR #) to Notes.
