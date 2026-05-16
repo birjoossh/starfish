@@ -16,7 +16,7 @@ Everything below must be completed before we move to Phase 2.
 
 Single source of truth for the status of every TODO-### in this file. Update on completion of each item. The per-section detail blocks below stay as the spec / why / depends-on reference; this table is the at-a-glance roll-up.
 
-Last updated: **2026-05-16** — wave-1 cleanup. Six items shipped on `feature/wave-1-remaining-todos`: TODO-123 (VA rules), TODO-112 (seed CSV), TODO-115 (seed validation), TODO-127 (orchestrator FK-ordered), TODO-128 (validation report), TODO-124 (Alembic baseline). Tests for the first five passing (38 in the two new test files plus the existing suite); Alembic baseline verified via offline-SQL dry-run. Remaining wave-1 work is bottom-of-ladder infra: TODO-113 (constituent maintenance loader for actual reconstitution drift), TODO-129 (download cache), TODO-125 (symbol_alias), TODO-126 (composite+BRIN indexes).
+Last updated: **2026-05-16** — wave-1 cleanup + UI audit. Six items shipped on `feature/wave-1-remaining-todos`: TODO-123 (VA rules), TODO-112 (seed CSV), TODO-115 (seed validation), TODO-127 (orchestrator FK-ordered), TODO-128 (validation report), TODO-124 (Alembic baseline). Tests for the first five passing (38 in the two new test files plus the existing suite); Alembic baseline verified via offline-SQL dry-run. Playwright audit of the dashboard surfaced three new tracked items: **TODO-130** (stale UI placeholders for data that's now lit — highest signal value), **TODO-131** (`dim_stock.market_cap_cr` empty for all 50 stocks), **TODO-132** (`fact_corporate_action` has 0 rows despite table/parser/loader all done). Remaining wave-1 infra items follow: TODO-113, TODO-129, TODO-125, TODO-126.
 
 **Sort order:** **Open / Partial items are sorted by signal-value priority** — what each TODO unlocks for the investment-decision flow on the dashboard. The reasoning per rank is in the "Why this rank" column. Done items are listed below the open set in numeric ID order, since their relative ranking no longer affects the next-action decision.
 
@@ -24,10 +24,13 @@ Last updated: **2026-05-16** — wave-1 cleanup. Six items shipped on `feature/w
 
 | Rank | ID | Title | Milestone | Status | Why this rank for signal value |
 |---|---|---|---|---|---|
-| 1 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. TODO-112 seed loader (just closed) handles the 50 ADD rows for the baseline; this item only matters when NSE publishes a real reconstitution. |
-| 2 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
-| 3 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
-| 4 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
+| ⭐ 1 | 130 | Wire stale dashboard placeholders to live data | UI | ⬜ Open | Surfaced by 2026-05-16 Playwright audit. KPI cards #1 Nifty Index, #2 52-Week Bracket, #4 Realized Vol-20D (`dashboard/overview.py:110/116/124`) render as muted placeholders with "TODO-106 pending" hints, but `nifty50_index_prices` has 38 days of data (TODO-106 closed). Same for §03 Trend Workbench RS pill (`section_trend.py:191,494` hardcodes "RS · Nifty unavailable") even though `rs_vs_nifty_1m` is lit on all 111k mart rows. §08 header hint (`app.py:172`) says "TODO-119/120" but 944 events are loaded. Highest signal value because every Rahul/Sanjana/Vikram session sees these as the first thing on the page. |
+| 2 | 132 | Run `fact_corporate_action` daily ingestion | M1.4 | ⬜ Open | Table exists (TODO-116 ✅), parser exists (TODO-117 ✅), loader exists (TODO-118 ✅), but DB has 0 rows. Daily pipeline does not invoke `CorporateActionsLoader`. Unblocks dividend-adjusted returns, ex-date markers on Trend Workbench, and ISS Factor 5 corporate-action component. |
+| 3 | 131 | Populate `dim_stock.market_cap_cr` | M1.1 | ⬜ Open | Column exists (TODO-102 ✅) but is NULL for all 50 stocks. Treemap cell sizing falls back to ISS score per `dashboard/overview.py:361` caption. Needs a one-time seed (snapshot from NSE security master or Screener export) plus a refresh cadence — monthly is fine since mcap doesn't move the treemap meaningfully day-to-day. |
+| 4 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. TODO-112 seed loader (just closed) handles the 50 ADD rows for the baseline; this item only matters when NSE publishes a real reconstitution. |
+| 5 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
+| 6 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
+| 7 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
 
 ### Closed items (numeric ID order)
 
