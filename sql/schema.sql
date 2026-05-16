@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS mart_volume_anomaly (
     nearest_event_within_5d VARCHAR(500),
     nearest_event_type     VARCHAR(50),
     anomaly_direction      VARCHAR(10)   NOT NULL CHECK (anomaly_direction IN ('Up', 'Down')),
+    va_rule                VARCHAR(60),
     PRIMARY KEY (calc_date, symbol),
     FOREIGN KEY (symbol) REFERENCES dim_stock(symbol)
 );
