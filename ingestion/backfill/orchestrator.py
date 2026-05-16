@@ -23,6 +23,7 @@ from ingestion.bhavcopy_parser import BhavcopyParser, BhavcopyParseError
 from ingestion.bhavcopy_loader import BhavcopyLoader
 from analytics.compute_52wk import compute_52wk
 from analytics.compute_signals import compute_signals
+from analytics.compute_volume_anomalies import compute_volume_anomalies
 
 logging.basicConfig(
     level=logging.INFO,
@@ -113,16 +114,38 @@ class BackfillOrchestrator:
         err_str = str(e)
         return "404" in err_str or "Not Found" in err_str
 
-    def run(self, start_date: date, end_date: date, skip_index=False, skip_analytics=False):
-        """Run backfill orchestration."""
+    def run(self, start_date: date, end_date: date, skip_index=False,
+            skip_analytics=False, skip_constituents=False):
+        """Run backfill orchestration.
+
+        FK-ordered sequence:
+        1. dim_nifty50_constituent (seed from nifty50_history.csv)
+        2. fact_eod_price (bhavcopy) + nifty50_index_prices
+        3. fact_52wk → mart_stock_signals → mart_volume_anomaly
+        """
         logger.info(f"Starting backfill from {start_date} to {end_date}")
 
         stats = {
             "days_processed": 0,
             "bhavcopy_loaded": 0,
             "index_loaded": 0,
-            "errors": 0
+            "errors": 0,
+            "constituents_loaded": 0,
         }
+
+        # Step 0: Seed constituent history for point-in-time membership
+        if not skip_constituents:
+            history_path = settings.project_root / "data" / "raw" / "reconstitution" / "nifty50_history.csv"
+            if history_path.exists():
+                try:
+                    from ingestion.nifty50_history_loader import load_history_csv
+                    rows = load_history_csv(history_path)
+                    stats["constituents_loaded"] = rows
+                    logger.info(f"Seeded constituent history: {rows} rows")
+                except Exception as e:
+                    logger.warning(f"Constituent history seed skipped: {e}")
+            else:
+                logger.info(f"No constituent history file at {history_path} — skipping seed")
 
         current = end_date
         while current >= start_date:
@@ -202,14 +225,14 @@ class BackfillOrchestrator:
         logger.info(f"Load complete. Processed {stats['days_processed']} days. "
                     f"Errors on {stats['errors']} days.")
 
-        # 3. Post-load analytics
+        # 3. Post-load analytics (FK-ordered: 52wk → signals → volume anomalies)
         if not skip_analytics:
-            logger.info("Running post-load analytics (52-week & signals)...")
+            logger.info("Running post-load analytics (52-week → signals → volume anomalies)...")
             try:
                 c52 = compute_52wk()
                 logger.info(f"Computed 52-week data: {c52} rows.")
                 cs = compute_signals()
-                logger.info(f"Computed signals: {cs} rows.")
+                logger.info(f"Computed signals: {cs} rows (incl. volume anomalies).")
             except Exception as e:
                 logger.error(f"Analytics failed: {e}")
                 logger.debug(traceback.format_exc())
@@ -221,6 +244,7 @@ def main():
     parser.add_argument("--end", type=str, help="End date (YYYY-MM-DD)")
     parser.add_argument("--skip-index", action="store_true", help="Skip index prices")
     parser.add_argument("--skip-analytics", action="store_true", help="Skip post-load analytics")
+    parser.add_argument("--skip-constituents", action="store_true", help="Skip constituent history seed")
     parser.add_argument("--local", type=str, help="Local directory with cached CSVs")
 
     args = parser.parse_args()
@@ -240,7 +264,8 @@ def main():
         start_date=start_date,
         end_date=end_date,
         skip_index=args.skip_index,
-        skip_analytics=args.skip_analytics
+        skip_analytics=args.skip_analytics,
+        skip_constituents=args.skip_constituents,
     )
 
 if __name__ == "__main__":
