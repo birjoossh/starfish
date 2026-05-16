@@ -11,12 +11,12 @@ Drill-in: any row click in §02/§04–§08 sets ``st.session_state.trend_subjec
 which feeds this section's subject picker.
 
 Backend gaps (handled gracefully):
-    * ``rs_vs_nifty_series`` will be ``None`` until TODO-106 (NSE index
-      prices) lands — Workbench hides the overlay + shows a "RS unavailable"
-      pill.
-    * ``events`` will be ``[]`` until corporate events ingestion (TODO-119/
-      120) lands — Workbench renders the chart without markers + shows a
-      muted "no events in window" note.
+    * ``rs_vs_nifty_series`` is computed from ``nifty50_index_prices`` and
+      returns None for calc_dates outside the ingested index window — the
+      stats sidebar surfaces a warn pill only in that case.
+    * ``events`` is sourced from ``fact_corporate_event``; if a particular
+      window has no events the chart renders without markers and a muted
+      "no events in window" note appears.
     * ``iss_series`` is constant 0.0 until ISS scoring lands (TODO-122) —
       we render the line but pill the sidebar with "ISS pipeline pending".
 """
@@ -188,7 +188,7 @@ def _render_filter_row(signals_df: pd.DataFrame) -> None:
     st.markdown(
         f"""
 <div class="mono" style="font-size:10px;color:var(--tx3);margin-top:6px">
-  Overlays · {pill('Events', 'evt')} {pill('52WH/L', 'acc')} {pill('RS · Nifty unavailable', 'warn')} <span class="tag" style="margin-left:6px">SMA 50</span> <span class="tag">SMA 200</span>
+  Overlays · {pill('Events', 'evt')} {pill('52WH/L', 'acc')} {pill('RS · Nifty', 'acc')} <span class="tag" style="margin-left:6px">SMA 50</span> <span class="tag">SMA 200</span>
   &nbsp;·&nbsp; ↻ click any row in §02–§08 to focus subject here
 </div>
 """,
@@ -372,7 +372,7 @@ def _render_price_volume_chart(payload: dict[str, Any]) -> None:
         st.markdown(
             '<div class="mono" style="font-size:10px;color:var(--tx3);'
             'padding:2px 4px 0 4px">'
-            "no corporate events in this window · TODO-119/120 not yet seeded"
+            "no corporate events in this window"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -491,7 +491,11 @@ def _render_stats_sidebar(payload: dict[str, Any]) -> None:
             return "tx2"
         return "pos" if v > 0 else "neg"
 
-    rs_pill = pill("RS · Nifty unavailable · TODO-106", "warn")
+    rs_pill = (
+        pill("RS · Nifty unavailable for window", "warn")
+        if payload.get("rs_vs_nifty_series") is None
+        else ""
+    )
     iss_pill = pill("ISS pipeline pending · TODO-122", "warn") if (iss_now in (None, 0.0)) else ""
 
     iss_block = ""
@@ -546,8 +550,8 @@ def _render_stats_sidebar(payload: dict[str, Any]) -> None:
     {rs_pill} {iss_pill}
   </div>
   <div class="mono" style="font-size:10px;color:var(--tx3);margin-top:12px;line-height:1.5">
-    Source · <span class="acc">fact_eod_price</span> + <span class="acc">mart_stock_signals</span>.<br>
-    Events / RS pending TODO-106, TODO-119/120, TODO-122.
+    Source · <span class="acc">fact_eod_price</span> + <span class="acc">mart_stock_signals</span> + <span class="acc">fact_corporate_event</span>.<br>
+    ISS factor decomposition pending TODO-122.
   </div>
 </div>
 """,

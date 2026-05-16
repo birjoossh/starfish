@@ -160,13 +160,93 @@ def get_prices_range(
     return df.to_dict("records")
 
 
+def _resolve_effective_calc_date(calc_date: Optional[str]) -> Optional[str]:
+    """Resolve the calc_date used by /market-overview when the caller omits it."""
+    if calc_date:
+        return calc_date
+    df = read_sql_df("SELECT MAX(calc_date) AS d FROM mart_stock_signals")
+    if df.empty or df.iloc[0]["d"] is None:
+        return None
+    d = df.iloc[0]["d"]
+    return d.isoformat() if hasattr(d, "isoformat") else str(d)
+
+
+def _build_nifty_index_block(eff_date: Optional[str]) -> dict[str, Any]:
+    """Return a `{trade_date, close, prev_close, return_1d, realized_vol_20d, window_days}` block.
+
+    The block anchors on ``nifty50_index_prices`` (TODO-106 ingestion). Fields
+    collapse to None when the backfill window can't cover them — the dashboard
+    falls back to the muted-pending KPI for any None field.
+
+    window_days reports the actual ingested coverage so the §01 "52-Week
+    Bracket" card can render an honest "have N of 252 sessions" hint instead
+    of an 8-week bracket mislabeled as 52-week.
+    """
+    empty: dict[str, Any] = {
+        "trade_date": None,
+        "close": None,
+        "prev_close": None,
+        "return_1d": None,
+        "realized_vol_20d": None,
+        "window_days": 0,
+    }
+    if not eff_date:
+        return empty
+    df = read_sql_df(
+        """
+        SELECT trade_date, close
+        FROM nifty50_index_prices
+        WHERE trade_date <= :eff_date
+        ORDER BY trade_date DESC
+        LIMIT 252
+        """,
+        params={"eff_date": eff_date},
+    )
+    if df.empty:
+        return empty
+
+    df = df.sort_values("trade_date", ascending=False).reset_index(drop=True)
+    latest = df.iloc[0]["trade_date"]
+    latest_iso = latest.isoformat() if hasattr(latest, "isoformat") else str(latest)
+    if latest_iso != eff_date:
+        # Calc_date is past the ingested window; don't surface stale numbers.
+        return {**empty, "window_days": int(len(df))}
+
+    close = float(df.iloc[0]["close"])
+    prev_close = float(df.iloc[1]["close"]) if len(df) >= 2 else None
+    return_1d = (close / prev_close - 1.0) if prev_close else None
+
+    realized_vol_20d: Optional[float] = None
+    if len(df) >= 21:
+        closes_21 = (
+            df.head(21)
+            .sort_values("trade_date")["close"]
+            .astype(float)
+            .reset_index(drop=True)
+        )
+        log_returns = (closes_21 / closes_21.shift(1)).apply(
+            lambda r: math.log(r) if r and r > 0 else float("nan")
+        ).dropna()
+        if len(log_returns) == 20:
+            realized_vol_20d = float(log_returns.std(ddof=1) * math.sqrt(252))
+
+    return {
+        "trade_date": latest_iso,
+        "close": close,
+        "prev_close": prev_close,
+        "return_1d": return_1d,
+        "realized_vol_20d": realized_vol_20d,
+        "window_days": int(len(df)),
+    }
+
+
 @app.get("/market-overview")
 def get_market_overview(calc_date: Optional[str] = Query(None)):
     """Return aggregated stats for the market overview page."""
-    
+
     # Defaults to max date if not specified
     date_filter = "s.calc_date = :calc_date" if calc_date else "s.calc_date = (SELECT MAX(calc_date) FROM mart_stock_signals)"
-    
+
     # 1. Sector Breadth Aggregates — restrict to current Nifty 50 constituents
     df = read_sql_df(f"""
         SELECT
@@ -192,10 +272,13 @@ def get_market_overview(calc_date: Optional[str] = Query(None)):
         WHERE {date_filter}
           AND d.nifty50_member = TRUE
     """, params={"calc_date": calc_date} if calc_date else {})
-    
+
+    nifty_index = _build_nifty_index_block(_resolve_effective_calc_date(calc_date))
+
     return {
         "sector_breadth": df.to_dict("records") if not df.empty else [],
-        "components": raw.to_dict("records") if not raw.empty else []
+        "components": raw.to_dict("records") if not raw.empty else [],
+        "nifty_index": nifty_index,
     }
 
 

@@ -5,9 +5,11 @@ Layout (per design lock):
     Row 2: Sector Breadth table (5 cols) + Performance Heatmap (7 cols)
     Row 3: Optional drill-in (Primary Scanner subset) when a sector or treemap cell is clicked
 
-Backend gaps surfaced as muted "pending" panels (TODO-106 NSE index prices)
-rather than blocking the rest of the section. Real data is rendered for
-everything that exists in ``mart_stock_signals``.
+Cards #1 (Nifty 50 Index) and #4 (Realized Vol · 20D) render live values from
+``nifty50_index_prices`` once the calc_date is inside the ingested window.
+Card #2 (52-Week Bracket) stays muted until the index backfill reaches 252
+sessions — surfacing an 8-week bracket under a 52-week label is a worse UX
+than the muted pending state.
 """
 from __future__ import annotations
 
@@ -43,7 +45,7 @@ def fetch_market_overview(calc_date: str) -> dict[str, Any]:
             return resp.json()
     except Exception:
         pass
-    return {"sector_breadth": [], "components": []}
+    return {"sector_breadth": [], "components": [], "nifty_index": {}}
 
 
 # ------------------------------ Public API ------------------------------- #
@@ -65,6 +67,7 @@ def render_overview(
         data = fetch_market_overview(calc_date)
     sector_df = pd.DataFrame(data.get("sector_breadth", []))
     components = pd.DataFrame(data.get("components", []))
+    nifty_index = data.get("nifty_index") or {}
 
     if components.empty:
         st.markdown(
@@ -75,7 +78,7 @@ def render_overview(
         )
         return
 
-    _render_kpi_strip(sector_df, components)
+    _render_kpi_strip(sector_df, components, nifty_index)
     st.write("")  # spacing
 
     col_breadth, col_heatmap = st.columns([5, 7], gap="small")
@@ -91,8 +94,12 @@ def render_overview(
 # ----------------------------- KPI strip --------------------------------- #
 
 
-def _render_kpi_strip(sector_df: pd.DataFrame, components: pd.DataFrame) -> None:
-    """5 KPI cards. Cards 1, 2, 4 are placeholders pending TODO-106 (index prices)."""
+def _render_kpi_strip(
+    sector_df: pd.DataFrame,
+    components: pd.DataFrame,
+    nifty_index: dict[str, Any],
+) -> None:
+    """5 KPI cards. Card #2 stays muted until the index backfill reaches 252 sessions."""
     avg_1d = float(components["return_1d"].mean() * 100) if not components.empty else 0.0
     avg_1m = float(components["return_1m"].mean() * 100) if not components.empty else 0.0
     avg_iss = float(components["iss_score"].mean()) if not components.empty else 0.0
@@ -104,28 +111,37 @@ def _render_kpi_strip(sector_df: pd.DataFrame, components: pd.DataFrame) -> None
     )
     unch = max(0, n_total - adv - dec)
 
+    window_days = int(nifty_index.get("window_days") or 0)
+
     cols = st.columns(5, gap="small")
 
     with cols[0]:
-        _pending_kpi(
-            "Nifty 50 Index",
-            "—",
-            "TODO-106 · NSE index prices ingestion pending",
-        )
+        if nifty_index.get("close") is not None:
+            _nifty_index_kpi(nifty_index)
+        else:
+            _pending_kpi(
+                "Nifty 50 Index",
+                "—",
+                f"no index close for selected date · index series covers {window_days} sessions",
+            )
     with cols[1]:
         _pending_kpi(
             "52-Week Bracket",
             "—",
-            "index 52W data pending · TODO-106",
+            f"need 252 sessions for 52W bracket · have {window_days}",
         )
     with cols[2]:
         _avg_constituent_kpi(avg_1d, avg_1m, avg_iss)
     with cols[3]:
-        _pending_kpi(
-            "Realized Vol · 20D",
-            "—",
-            "vol gauge needs index series · TODO-106",
-        )
+        rv = nifty_index.get("realized_vol_20d")
+        if rv is not None:
+            _vol_20d_kpi(float(rv))
+        else:
+            _pending_kpi(
+                "Realized Vol · 20D",
+                "—",
+                f"need 21 sessions for 20D vol · have {window_days}",
+            )
     with cols[4]:
         _breadth_donut_kpi(adv, dec, unch)
 
@@ -164,6 +180,62 @@ def _avg_constituent_kpi(avg_1d: float, avg_1m: float, avg_iss: float) -> None:
       &nbsp;·&nbsp;ISS avg&nbsp;<span class="acc">{avg_iss:.0f}</span>
     </div>
     {divergence_pill}
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def _nifty_index_kpi(block: dict[str, Any]) -> None:
+    """Real KPI — Nifty 50 index close + 1D % delta."""
+    close = float(block["close"])
+    ret_1d = block.get("return_1d")
+    trade_date = escape(str(block.get("trade_date") or "—"))
+    if ret_1d is not None:
+        ret_pct = float(ret_1d) * 100
+        ret_cls = "pos" if ret_pct > 0 else "neg" if ret_pct < 0 else "tx2"
+        delta_html = (
+            f'<span class="mono {ret_cls}" style="font-size:13px">{ret_pct:+.2f}%</span>'
+        )
+    else:
+        delta_html = '<span class="mono tx3" style="font-size:13px">1D —</span>'
+    st.markdown(
+        f"""
+<div class="panel" style="padding:14px;height:140px;display:flex;flex-direction:column;justify-content:space-between">
+  <div>
+    <div class="kicker">Nifty 50 Index</div>
+    <div class="serif" style="font-size:30px;line-height:1;margin-top:6px">{close:,.2f}</div>
+  </div>
+  <div>
+    <div style="margin-bottom:4px">{delta_html}</div>
+    <div class="mono" style="font-size:10px;color:var(--tx3)">close · {trade_date}</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def _vol_20d_kpi(realized_vol: float) -> None:
+    """Real KPI — annualized 20D realized vol of Nifty 50 (σ × √252)."""
+    pct = realized_vol * 100
+    if pct < 12:
+        bucket, bucket_cls = "low", "pos"
+    elif pct < 20:
+        bucket, bucket_cls = "normal", "tx2"
+    else:
+        bucket, bucket_cls = "elevated", "warn"
+    st.markdown(
+        f"""
+<div class="panel" style="padding:14px;height:140px;display:flex;flex-direction:column;justify-content:space-between">
+  <div>
+    <div class="kicker">Realized Vol · 20D</div>
+    <div class="serif" style="font-size:30px;line-height:1;margin-top:6px">{pct:.1f}%</div>
+  </div>
+  <div>
+    <div class="mono {bucket_cls}" style="font-size:11px;margin-bottom:4px">{bucket}</div>
+    <div class="mono" style="font-size:10px;color:var(--tx3)">σ log-returns × √252 · index</div>
   </div>
 </div>
 """,

@@ -44,7 +44,8 @@ from dashboard.section_volume import render_volume_section
 from dashboard.section_watchlist import render_watchlist_section
 from dashboard.tokens import inject_global_styles
 
-# §08 still wraps phase_g pending TODO-119/120 (corp event ingestion).
+# §08 wraps phase_g for now; retokenize is deferred until the section ships
+# its own primitives-based renderer.
 from dashboard.phase_g import render_events_tracker  # noqa: E402
 
 
@@ -169,14 +170,13 @@ def _render_section_07_volume(
 def _render_section_08_events(calc_date: str) -> None:
     render_section_header(
         "08", "Corporate Events Tracker",
-        hint="data: fact_corporate_event · TODO-119/120",
+        hint="data: fact_corporate_event",
     )
     try:
         render_events_tracker()
     except Exception as e:
         _placeholder(
-            f"§08 Events Tracker unavailable: {type(e).__name__}. "
-            "Likely blocked on TODO-119/120 (events table not yet seeded)."
+            f"§08 Events Tracker unavailable: {type(e).__name__}."
         )
 
 
