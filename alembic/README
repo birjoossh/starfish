@@ -1,0 +1,41 @@
+Alembic — Nifty 50 Dashboard schema migrations
+
+Source of truth
+---------------
+Post-baseline, alembic/versions/ is canonical for schema. sql/schema.sql is
+the captured baseline (revision 0001_baseline) and is applied verbatim by
+the baseline migration. Do not edit sql/schema.sql or add new
+sql/migrations/*.sql — they will not be applied by ``alembic upgrade head``.
+
+DB URL
+------
+alembic/env.py reads config.settings.db_url at import time. The
+``sqlalchemy.url`` value in alembic.ini is a required Alembic placeholder
+but is never used at runtime — set DATABASE settings via env vars / .env
+the same way the rest of the app does.
+
+First-time bootstrap on an existing database
+--------------------------------------------
+If your database already has the schema applied (via the old
+``psql -f sql/schema.sql`` workflow), mark it as caught up to the
+baseline without re-running DDL:
+
+    alembic stamp 0001_baseline
+
+Then ``alembic upgrade head`` will pick up any later revisions.
+
+Fresh database
+--------------
+    alembic upgrade head
+
+This creates every table in sql/schema.sql plus the alembic_version
+tracking table.
+
+Adding a new schema change
+--------------------------
+    alembic revision -m "describe the change"
+
+Edit the generated file under alembic/versions/. Use ``op.execute(...)``
+for raw SQL or the Alembic op DDL helpers. Then:
+
+    alembic upgrade head

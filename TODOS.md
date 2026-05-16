@@ -16,7 +16,7 @@ Everything below must be completed before we move to Phase 2.
 
 Single source of truth for the status of every TODO-### in this file. Update on completion of each item. The per-section detail blocks below stay as the spec / why / depends-on reference; this table is the at-a-glance roll-up.
 
-Last updated: **2026-05-16** — wave-1 cleanup. Five rank-3 through rank-12 items shipped on `feature/wave-1-remaining-todos`: TODO-123 (VA rules), TODO-112 (seed CSV), TODO-115 (seed validation), TODO-127 (orchestrator FK-ordered), TODO-128 (validation report). Tests for all five passing (38 in the two new test files plus the existing suite). Remaining wave-1 work is now bottom-of-ladder infra: TODO-113 (constituent maintenance loader for actual reconstitution drift), TODO-129 (download cache), TODO-125 (symbol_alias), TODO-124 (Alembic), TODO-126 (composite+BRIN indexes).
+Last updated: **2026-05-16** — wave-1 cleanup. Six items shipped on `feature/wave-1-remaining-todos`: TODO-123 (VA rules), TODO-112 (seed CSV), TODO-115 (seed validation), TODO-127 (orchestrator FK-ordered), TODO-128 (validation report), TODO-124 (Alembic baseline). Tests for the first five passing (38 in the two new test files plus the existing suite); Alembic baseline verified via offline-SQL dry-run. Remaining wave-1 work is bottom-of-ladder infra: TODO-113 (constituent maintenance loader for actual reconstitution drift), TODO-129 (download cache), TODO-125 (symbol_alias), TODO-126 (composite+BRIN indexes).
 
 **Sort order:** **Open / Partial items are sorted by signal-value priority** — what each TODO unlocks for the investment-decision flow on the dashboard. The reasoning per rank is in the "Why this rank" column. Done items are listed below the open set in numeric ID order, since their relative ranking no longer affects the next-action decision.
 
@@ -27,8 +27,7 @@ Last updated: **2026-05-16** — wave-1 cleanup. Five rank-3 through rank-12 ite
 | 1 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. TODO-112 seed loader (just closed) handles the 50 ADD rows for the baseline; this item only matters when NSE publishes a real reconstitution. |
 | 2 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
 | 3 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
-| 4 | 124 | Alembic migrations for all tables | M1.5 | 🟨 Partial | Skeleton in place (`alembic.ini`, `alembic/env.py`, empty `alembic/versions/`). Still need: wire env.py to `settings.db_url`, baseline migration that runs `sql/schema.sql`, decision on schema.sql vs versions/ as the post-baseline source of truth. Zero direct signal value. |
-| 5 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
+| 4 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
 
 ### Closed items (numeric ID order)
 
@@ -36,6 +35,7 @@ Last updated: **2026-05-16** — wave-1 cleanup. Five rank-3 through rank-12 ite
 |---|---|---|---|---|
 | 001 | CSV column-header validation | Cross-cutting | ✅ Done | — |
 | 003 | Idempotency across ingestion scripts | Cross-cutting | ✅ Done | — |
+
 | 004 | Rate limiting for NSE downloads | Cross-cutting | ✅ Done | — |
 | 101 | `fact_eod_price` columns (14) align with spec | M1.1 | ✅ Done | — |
 | 102 | `dim_stock` columns (10) align with spec | M1.1 | ✅ Done | — |
@@ -67,6 +67,7 @@ Last updated: **2026-05-16** — wave-1 cleanup. Five rank-3 through rank-12 ite
 | 123 | `mart_volume_anomaly` table — VA-1…VA-7 rules | M1.5 | ✅ Done | `analytics/compute_volume_anomalies.py:_match_va_rule` evaluates the 7 spec rules in priority order (VA-5 first, VA-4 last). New `va_rule VARCHAR(60)` column on `mart_volume_anomaly` (schema + migration `sql/migrations/006_va_rule_column.sql`). ±3-day event proximity and rolling 5-day dry-up counter computed per symbol. Wired into the post-load analytics chain: `compute_signals.py` calls `compute_volume_anomalies` after `mart_stock_signals` is populated. 25 unit tests in `tests/unit/test_volume_anomaly_engine.py` cover rule priority, threshold boundaries, NULL delivery handling, and edge cases. Closed 2026-05-16. |
 | 127 | Backfill orchestrator (5-year, FK-ordered) | M1.5 | ✅ Done | `ingestion/backfill/orchestrator.py` runs in FK-correct sequence: step 0 (optional) seeds `dim_nifty50_constituent` via `nifty50_history_loader`, step 1 loads `fact_eod_price` + `nifty50_index_prices` per trading day, step 2 runs the analytics chain (52wk → signals → volume anomalies) in one pass at the end. New `--skip-constituents` flag. Closed 2026-05-16. |
 | 128 | Backfill validation report (gaps, 52WK cross-check) | M1.5 | ✅ Done | `ingestion/backfill/validator.py` — per-year report covering row counts for 7 tables, monthly symbol coverage in `fact_eod_price`, missing-trading-day gap detection vs business-day calendar, duplicate-key check on `(trade_date, symbol)`, `pct_from_high` sanity, and a flag list (`ZERO_EOD_PRICES`, `HIGH_GAP_COUNT_N`, `DUPLICATE_KEYS`, `SIGNALS_NOT_COMPUTED`, `NO_INDEX_PRICES`). CLI: `python -m ingestion.backfill.validator --year 2024` for one year, `--all` for 2021→present. Closed 2026-05-16. |
+| 124 | Alembic migrations for all tables | M1.5 | ✅ Done | `alembic.ini` + `alembic/env.py` (reads `settings.db_url` at import time; the `sqlalchemy.url` placeholder in alembic.ini is never used at runtime) + `alembic/versions/0001_baseline_baseline_schema.py` which runs `sql/schema.sql` verbatim via `op.execute()`. Idempotent because every CREATE in schema.sql uses IF NOT EXISTS — `alembic upgrade head` is a no-op on existing DBs after `alembic stamp 0001_baseline`. **Post-baseline rule:** `alembic/versions/` is canonical; new schema changes go through `alembic revision`, not direct edits to schema.sql or new `sql/migrations/*.sql` files. Operator README at `alembic/README`. Closed 2026-05-16. |
 
 **Status legend:** ✅ Done · 🟨 Partial · ⬜ Open · 🚫 Blocked (explicit hard block — call out in Notes).
 
