@@ -33,6 +33,7 @@ from ingestion.framework.loaders import (
     EventCalendarLoader,
     AnnouncementsLoader,
     IntradayLoader,
+    IndexPriceLoader
 )
 from ingestion.framework.log import IngestionLogger
 from ingestion.framework.pipeline import Pipeline
@@ -46,6 +47,7 @@ __all__ = [
     "Wk52Loader",
     "ConstituentsLoader",
     "ReconstitutionLoader",
+    "IndexPriceLoader",
     "CorporateActionsFrameworkLoader",
     "EventCalendarLoader",
     "AnnouncementsLoader",

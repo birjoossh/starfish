@@ -115,6 +115,48 @@ Tracked at section-level for now; will be broken into individual TODOs when M1 c
 
 ---
 
+## Data Backfill Requirements
+
+Snapshot as of **2026-05-17**. The dashboard ships against whatever's in Postgres — every gate, gauge, treemap, and signal table feeds off the same handful of tables below. Until the **Target** column is met, the corresponding dashboard surface either shows a muted pending hint (Card #2 52W Bracket, RS overlays on early dates) or relaxes its filter with a visible "gate relaxed" pill (§02 Watchlist categories).
+
+### Coverage matrix — what's lit vs. what's still empty
+
+| Table | Current | Target | Backfill command | Cadence | Unblocks |
+|---|---|---|---|---|---|
+| `dim_stock` | 6,442 rows (58 Nifty 50 members) | NSE security master fully populated | `python -m ingestion.framework.run_pipeline --source dim-stock --date YYYY-MM-DD --local-file NSE_CM_security_DDMMYYYY.csv` | Monthly (or on reconstitution) | Sector/industry labels, ISIN joins |
+| `dim_stock.market_cap_cr` | **0 / 50** Nifty 50 names populated (NULL) | All 50 hydrated | Manual seed pending (TODO-131) | Monthly | Treemap cell sizing (currently falls back to ISS) |
+| `dim_nifty50_constituent` | 14,450 rows · 2025-04-01 → 2026-05-08 | 2021-01-01 → today (per spec §C) | `python -m ingestion.framework.run_pipeline --source constituents --start 2021-01-01 --end YYYY-MM-DD` (and reconstitution drops in `data/raw/reconstitution/`) | On reconstitution (Mar / Sep), reseed via `data/raw/reconstitution/nifty50_history.csv` | Point-in-time membership for §03 sector RS aggregation |
+| `fact_eod_price` | 111,028 rows · 43 trading days · 2026-03-11 → 2026-05-08 | **5 years** (~1,260 sessions) per spec M1.5 | `python -m ingestion.backfill.orchestrator --start 2021-01-01 --end YYYY-MM-DD` (+ `--local data/bhavcopy` for cached CSVs) | Daily EOD via `python -m ingestion.daily_run` | All return columns, 52W computation, RS series, scanner gates |
+| `fact_52wk` | 111,028 rows · 43 trading days (derived) | Recomputed after each `fact_eod_price` extension | `python -m analytics.compute_52wk` | Daily EOD (auto after bhavcopy) | Drawdown scanner thresholds, breakout monitor |
+| `nifty50_index_prices` | **38 rows** · 2026-03-11 → 2026-05-08 | **≥ 252 sessions** for §01 Card #2 (52W Bracket) | `python -m ingestion.daily_run` (index step) or backfill via `python -m ingestion.backfill.orchestrator` | Daily EOD; backfill once to ≥ 252 sessions | §01 Cards #1/#2/#4, §03 RS overlay outside the current 38-day window |
+| `fact_corporate_action` | **0 rows** | Dividends / splits / bonuses / buybacks for last 1 year | Loader exists (`ingestion/corporate_actions_loader.py`) but **not wired into the daily pipeline** — TODO-132 | Daily EOD once wired | Dividend-adjusted returns, ex-date markers on §03 Trend Workbench, ISS Factor 5 |
+| `fact_corporate_event` | 944 rows · 2026-04-28 → 2026-05-30 | Earnings / AGM / board-meeting calendar (forward + 1 year back) | `python -m ingestion.nse_scraper --source event-calendar` and `--source announcements`; framework: `--source event-calendar / announcements` | Daily (calendar) + Hourly during market hours (announcements) | §08 Events tracker, §03 event annotations, Event-Driven watchlist tab |
+| `mart_stock_signals` | 111,028 rows · 43 days (derived) | Recomputed after each new `fact_eod_price` day | `python -m analytics.compute_signals --date YYYY-MM-DD` | Daily EOD (auto via orchestrator post-load step) | §01-§07 entire dashboard |
+| `mart_volume_anomaly` | 111,028 rows · 43 days (derived) | Recomputed alongside signals | `python -m analytics.compute_volume_anomalies --date YYYY-MM-DD` | Daily EOD (auto via orchestrator post-load step) | §07 Volume Anomaly Monitor, VA-1…VA-7 rule tagging |
+| `alerts` | 55 rows | Whatever the alert engine fires per day | `python -m alerts.alert_engine` (via `scripts/run_analytics.sh`) | Daily EOD (post-signals) | Phase 5 — out of M1 scope but rules already wired |
+| `ingestion_log` | 2 rows | One row per ingestion run | Auto-written by `Pipeline.run()` | Per ingestion run | Operational visibility · drives `--check` outputs |
+
+### What "fully populated" actually requires
+
+Three concrete backfill jobs would clear the remaining gating issues that today force muted UI states and relaxed §02 gates:
+
+1. **5-year EOD price history** — `python -m ingestion.backfill.orchestrator --start 2021-01-01 --end $(date +%F)` followed by `--skip-index` if index data is sourced separately, or just leave index-step enabled. Run once; ~1 hour with NSE rate limits. Unlocks 52-week math against real historical highs, kills the relaxed Contrarian/Drawdown gates, and gives §03 a full 6M/1Y/3Y window of data.
+2. **Index price extension** — same orchestrator covers it, or run `python -m ingestion.backfill.orchestrator --start 2021-01-01 --end $(date +%F)` (no `--skip-index`). Specifically extends `nifty50_index_prices` past the current 38-day window so the §01 52-Week Bracket card can render an honest 52W high/low and the §03 RS overlay covers older windows.
+3. **Corporate actions daily wiring** — fix TODO-132 by invoking `CorporateActionsLoader` from `ingestion/daily_run.py` (or scheduling it in the daily DAG). Backfill the last year once it's wired: `python -m ingestion.framework.run_pipeline --source corporate-actions --start 2025-05-17 --end $(date +%F)`. Unblocks the Event-Driven tab's ideal gate (currently always relaxed) and §03 ex-date markers.
+
+### Validation cadence
+
+After any backfill run, validate with:
+
+```bash
+python -m ingestion.backfill.validator --year 2024     # one year
+python -m ingestion.backfill.validator --all           # 2021 → present
+```
+
+Flags emitted (`ZERO_EOD_PRICES`, `HIGH_GAP_COUNT_N`, `DUPLICATE_KEYS`, `SIGNALS_NOT_COMPUTED`, `NO_INDEX_PRICES`) should all clear before the dashboard is considered "live-data-ready".
+
+---
+
 ## UI Feature Requests
 
 Tracked per project rule (`.claude/CLAUDE.md` → "Maintain a consistent todo list of new feature requests and track its status").

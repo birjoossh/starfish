@@ -23,6 +23,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from dashboard.section_trend import request_trend_focus
+
 from dashboard.widget_info import tooltip
 
 
@@ -218,8 +220,7 @@ def _render_momentum_table(mom: pd.DataFrame) -> None:
         idx = rows[0]
         if 0 <= idx < len(show):
             symbol = str(show.iloc[idx]["Symbol"])
-            st.session_state["trend_subject"] = symbol
-            st.session_state["trend_kind"] = "stock"
+            request_trend_focus(symbol, "stock", source="momentum")
             st.markdown(
                 f'<div class="mono" style="font-size:10px;color:var(--acc);padding:6px 4px">'
                 f"↻ {escape(symbol)} sent to §03 Trend Workbench · scroll up to view</div>",

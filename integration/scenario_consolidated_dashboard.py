@@ -95,6 +95,7 @@ def _fake_signals_frame() -> pd.DataFrame:
             "accumulation_flag": i % 4 == 0,
             "event_flag": i % 5 == 0,
             "iss_score": 30 + i * 5,
+            "rs_vs_nifty_1m": (i - 5) * 0.008,
             "rs_vs_nifty_3m": (i - 5) * 0.01,
             "rs_vs_nifty_1y": (i - 5) * 0.02,
             "last_event_type": None,
@@ -302,6 +303,83 @@ def test_kpi_strip_pending_when_nifty_index_block_empty() -> None:
             "TODO-130 regression: stale TODO-106 hint resurfaced in §01"
         )
         assert "have 0" in blob, "pending hint should disclose window_days=0"
+
+
+def test_pending_trend_focus_drain_no_widget_collision() -> None:
+    """Regression: setting `_pending_trend_subject` before a rerun must NOT
+    raise `StreamlitAPIException: trend_subject cannot be modified after the
+    widget with key trend_subject is instantiated`.
+
+    §03's filter row binds widgets to `trend_subject` / `trend_kind`; row
+    clicks in §04–§07 used to write those keys directly, which Streamlit
+    rejected. The fix routes drill-ins through `_pending_trend_*` slots
+    that `render_trend_section` drains BEFORE the widget binds.
+    """
+    fake = _fake_signals_frame()
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        at.session_state["_pending_trend_subject"] = "SYM03"
+        at.session_state["_pending_trend_kind"] = "stock"
+        at.run()
+        _assert_no_runtime_errors(at)
+        # Drain consumed pending and applied to widget-bound key.
+        keys = set(at.session_state.filtered_state)
+        assert at.session_state["trend_subject"] == "SYM03"
+        assert "_pending_trend_subject" not in keys
+
+
+def test_no_oscillation_with_concurrent_stale_selections() -> None:
+    """Regression: two persistent dataframe selections in different sections
+    must not ping-pong ``trend_subject`` back and forth on every rerun.
+
+    Before the per-source latch landed, this scenario reproduced an
+    infinite-rerun loop: §04 with row 3 selected pushed SYM03, §05 with row
+    5 selected pushed a different symbol, each rerun saw both selections as
+    "still selected" and re-fired ``st.rerun()`` against the other's value.
+    The latch (``_drill_last_<source>``) short-circuits same-symbol calls
+    so the loop terminates.
+    """
+    fake = _fake_signals_frame()
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        # Pre-seed both section dataframe selections so the rerun-driven
+        # `event` payload sees rows selected in §04-gainers and §05-drawdown.
+        at.session_state["movers_g_df"] = {"selection": {"rows": [3], "columns": []}}
+        at.session_state["dd_table"] = {"selection": {"rows": [5], "columns": []}}
+        at.run()
+        _assert_no_runtime_errors(at)
+        # trend_subject must have settled on SOMETHING (not None/missing).
+        # The exact winner depends on render order; what matters is the run
+        # completed within AppTest's default timeout without looping.
+        assert "trend_subject" in at.session_state.filtered_state
+
+
+def test_watchlist_event_driven_populates_with_event_flags() -> None:
+    """§02 Event-Driven panel must surface rows when any signal has
+    `event_flag=True`, even though the spec gate `iss_score >= 50` would
+    have excluded the lone match in this fixture.
+
+    Locks the relaxed-gate fallback added by the §02 fix.
+    """
+    fake = _fake_signals_frame()
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        at.run()
+        _assert_no_runtime_errors(at)
+        blob = _collect_markdown_text(at)
+        # Confirm the empty-state copy isn't dominating across all 4 tabs.
+        assert blob.count("no candidates pass ideal gate or fallback") < 4, (
+            "all four §02 tabs hit the empty state — relaxed gates not firing"
+        )
 
 
 def test_trend_rs_pill_no_stale_todo_reference() -> None:

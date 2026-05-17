@@ -71,6 +71,7 @@ from ingestion.framework.loaders.eod_price_loader import EodPriceLoader
 from ingestion.framework.loaders.event_calendar_loader import EventCalendarLoader
 from ingestion.framework.loaders.intraday_loader import IntradayLoader
 from ingestion.framework.loaders.reconstitution_loader import ReconstitutionLoader
+from ingestion.framework.loaders.index_loader import IndexPriceLoader
 from ingestion.framework.loaders.wk52_loader import Wk52Loader
 from ingestion.framework.pipeline import Pipeline
 
@@ -172,6 +173,15 @@ SOURCES: dict[str, SourceSpec] = {
         local_patterns=("*.csv",),
         local_only=True,
     ),
+    "index": SourceSpec(
+        name="index",
+        table="nifty50_index_prices",
+        drop_subdir="index",
+        loader_factory=IndexPriceLoader,
+        http_source=SourceType.INDEX,
+        local_patterns=("*.csv",),
+        local_only=False,
+    ),
     "corporate-actions": SourceSpec(
         name="corporate-actions",
         table="fact_corporate_action",
@@ -221,7 +231,7 @@ SOURCES: dict[str, SourceSpec] = {
 # dim-stock runs first so FK constraints in fact_* tables are satisfied.
 # H is excluded because the loader raises NotImplementedError.
 ALL_AUTOMATED = ["dim-stock", "bhavcopy", "wk52", "constituents",
-                 "corporate-actions", "event-calendar", "announcements"]  # reconstitution, intraday
+                 "corporate-actions", "event-calendar", "announcements", "index"]  # reconstitution, intraday
 
 
 def _drop_dir(spec: SourceSpec) -> Path:
@@ -442,6 +452,7 @@ def main() -> int:
             if range_mode:
                 results = run_range(spec, args.start, args.end, local_only=args.local_only)
                 ok_count = sum(1 for v in results.values() if isinstance(v, int))
+
                 logger.info(
                     "[%s] Backfill complete: %d/%d days succeeded",
                     spec.name, ok_count, len(results),

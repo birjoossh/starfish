@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.phase_f import drawdown_signal_tag
+from dashboard.section_trend import request_trend_focus
 from dashboard.widget_info import tooltip
 
 
@@ -155,8 +156,7 @@ def _render_drawdown_table(deep: pd.DataFrame) -> None:
         idx = rows[0]
         if 0 <= idx < len(show):
             symbol = str(show.iloc[idx]["Symbol"])
-            st.session_state["trend_subject"] = symbol
-            st.session_state["trend_kind"] = "stock"
+            request_trend_focus(symbol, "stock", source="drawdown")
             st.markdown(
                 f'<div class="mono" style="font-size:10px;color:var(--acc);padding:6px 4px">'
                 f"↻ {escape(symbol)} sent to §03 Trend Workbench · scroll up to view</div>",

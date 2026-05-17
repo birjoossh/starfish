@@ -18,6 +18,8 @@ import plotly.graph_objects as go
 import requests
 import streamlit as st
 
+from dashboard.section_trend import request_trend_focus
+
 
 API_URL = "http://localhost:8000"
 
@@ -169,8 +171,7 @@ def _render_movers_table(df: pd.DataFrame, *, kind: str, slot_key: str) -> None:
         idx = rows[0]
         if 0 <= idx < len(display):
             symbol = str(display.iloc[idx]["Symbol"])
-            st.session_state["trend_subject"] = symbol
-            st.session_state["trend_kind"] = "stock"
+            request_trend_focus(symbol, "stock", source=slot_key)
             st.markdown(
                 f'<div class="mono" style="font-size:10px;color:var(--acc);padding:6px 4px">'
                 f"↻ {escape(symbol)} sent to §03 Trend Workbench · scroll up to view</div>",

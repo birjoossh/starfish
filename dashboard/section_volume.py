@@ -23,6 +23,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from dashboard.section_trend import request_trend_focus
+
 from dashboard.widget_info import tooltip
 
 
@@ -157,8 +159,7 @@ def _render_spike_table(
         idx = rows[0]
         if 0 <= idx < len(sub):
             symbol = str(sub.iloc[idx]["Symbol"])
-            st.session_state["trend_subject"] = symbol
-            st.session_state["trend_kind"] = "stock"
+            request_trend_focus(symbol, "stock", source=slot_key)
             st.markdown(
                 f'<div class="mono" style="font-size:10px;color:var(--acc);padding:6px 4px">'
                 f"↻ {escape(symbol)} → §03</div>",
