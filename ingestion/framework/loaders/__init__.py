@@ -10,6 +10,7 @@ from ingestion.framework.loaders.corporate_actions_loader import CorporateAction
 from ingestion.framework.loaders.event_calendar_loader import EventCalendarLoader
 from ingestion.framework.loaders.announcements_loader import AnnouncementsLoader
 from ingestion.framework.loaders.intraday_loader import IntradayLoader
+from ingestion.framework.loaders.index_loader import IndexPriceLoader
 
 __all__ = [
     "BaseLoader",
@@ -21,4 +22,5 @@ __all__ = [
     "EventCalendarLoader",
     "AnnouncementsLoader",
     "IntradayLoader",
+    "IndexPriceLoader",
 ]

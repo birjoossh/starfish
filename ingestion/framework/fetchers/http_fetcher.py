@@ -26,6 +26,9 @@ _WK52_URL_TEMPLATE = (
 )
 # Constituents file is always the current list — no date in URL
 _CONSTITUENTS_URL = "https://archives.nseindia.com/content/indices/ind_nifty50list.csv"
+
+_INDEX_PRICES_URL = "https://archives.nseindia.com/content/indices/ind_close_all_{ddmmyyyy}.csv"
+
 # NSE security master (gzipped CSV; date in DDMMYYYY format)
 _DIM_STOCK_URL_TEMPLATE = (
     "https://nsearchives.nseindia.com/content/cm/interop/"
@@ -45,6 +48,7 @@ class SourceType(Enum):
     CORPORATE_ACTIONS = auto()  # per-symbol corporate actions API
     EVENT_CALENDAR = auto()     # event-calendar JSON API
     ANNOUNCEMENTS = auto()      # corporate-announcements JSON API
+    INDEX = auto()              # index close prices
 
 
 class NseHttpFetcher(BaseFetcher):
@@ -128,6 +132,14 @@ class NseHttpFetcher(BaseFetcher):
                 url=_ANNOUNCEMENTS_URL,
                 filename=f"announcements_{trade_date.strftime('%Y%m%d')}.json",
                 subdir="announcements",
+            )
+        if self.source == SourceType.INDEX:
+            return self._download_csv(
+                url=_INDEX_PRICES_URL.format(
+                    ddmmyyyy=trade_date.strftime("%d%m%Y")
+                ),
+                filename=f"ind_close_all_{trade_date.strftime('%Y%m%d')}.csv",
+                subdir="index",
             )
         raise FetchError(
             f"HTTP fetch not supported for source {self.source}. "

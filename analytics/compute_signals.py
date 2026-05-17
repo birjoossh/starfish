@@ -22,6 +22,7 @@ from analytics.corp_action_adjuster import adjust_prices
 from analytics.returns_engine import compute_returns
 from analytics.volume_engine import compute_volume
 from analytics.compute_52wk import compute_52wk
+from analytics.compute_volume_anomalies import compute_volume_anomalies
 from analytics.rs_engine import compute_rs
 from analytics.trend_stability_engine import compute_trend_stability
 from analytics.iss_scorer import compute_iss
@@ -387,6 +388,11 @@ def compute_signals(trade_date: date | None = None) -> int:
         conn.commit()
 
     logger.info(f"Signal computation complete: {written} rows written to mart_stock_signals")
+
+    logger.info("Computing volume anomalies...")
+    va_rows = compute_volume_anomalies(trade_date)
+    logger.info(f"Volume anomalies computed: {va_rows} rows written to mart_volume_anomaly")
+
     return written
 
 

@@ -161,6 +161,7 @@ cython_debug/
 /data/raw/**/*
 !/data/raw/**/
 !/data/raw/**/.gitkeep
+!/data/raw/reconstitution/nifty50_history.csv
 .logs/
 .pids/
 

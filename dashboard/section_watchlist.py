@@ -4,9 +4,14 @@ Layout (per design lock):
     Row 1: 4 category tabs (Contrarian / Momentum / Event-Driven / Volume-Confirmed)
     Row 2: Watchlist table (9 cols) + sticky ISS Gauge sidebar (3 cols)
 
-Categories filter the same `mart_stock_signals` slice locally — mirrors the
-logic in ``api/routers/watchlist.py::get_category_items`` but avoids an HTTP
-hop so the section also works under :mod:`streamlit.testing.v1.AppTest`.
+Filters mirror the spec gates in ``api/routers/watchlist.py`` but adapt to
+the live signal distribution: the spec's `iss_score >= 50` gate filters
+every Nifty 50 name out while ISS scoring is still warming up (current max
+36 across the universe), and `momentum_flag` / `rs_vs_nifty_3m` are sparse
+upstream. Each category therefore runs an ideal-gate first; when zero names
+qualify it falls back to a relaxed query with a visible "ISS gate relaxed"
+pill so the user knows the surfaced rows are best-available rather than
+spec-quality.
 
 Backend gap: ISS factor decomposition (Price Momentum / Volume Quality /
 Drawdown-Recovery / Corporate Event / Relative Strength sub-scores) is not
@@ -39,71 +44,215 @@ CATEGORIES: tuple[str, ...] = (
 )
 
 
-def _filter_category(signals_df: pd.DataFrame, category: str, min_iss: float = 50) -> pd.DataFrame:
-    """Apply the category-specific filter to a signals slice.
+# ----------------------------- Thresholds -------------------------------- #
+#
+# Default gate values per category. Stored in session_state under
+# ``wl_thresh__<category>__<param>`` so each widget owns one slot and
+# ``_filter_category`` reads the live values without prop-drilling.
 
-    Mirrors the logic in ``api/routers/watchlist.py::get_category_items`` so the
-    UI doesn't require an HTTP round-trip. Returns the rows that match the
-    category along with a ``key_reason`` column for the table.
+DEFAULT_THRESHOLDS: dict[str, dict[str, float]] = {
+    "Contrarian Opportunities": {
+        "ideal_dd_pct_max": -20.0,
+        "ideal_vol_ratio_max": 0.85,
+        "ideal_iss_min": 50.0,
+        "relaxed_dd_pct_max": -10.0,
+        "relaxed_vol_ratio_max": 1.0,
+    },
+    "Momentum Leaders": {
+        "ideal_iss_min": 70.0,
+        "ideal_rs_3m_min": 0.0,
+        "relaxed_iss_min": 0.0,
+        "relaxed_rs_1m_min": 0.0,
+        "relaxed_ret_1m_min": 0.0,
+    },
+    "Event-Driven Candidates": {
+        "ideal_iss_min": 50.0,
+    },
+    "Volume-Confirmed Movers": {
+        "vol_ratio_min": 2.0,
+        "return_1d_min": 0.0,
+    },
+}
+
+
+def _threshold_key(category: str, param: str) -> str:
+    return f"wl_thresh__{category}__{param}"
+
+
+def _get_threshold(category: str, param: str) -> float:
+    """Return the active value for ``(category, param)``, defaults if unset."""
+    key = _threshold_key(category, param)
+    return float(st.session_state.get(key, DEFAULT_THRESHOLDS[category][param]))
+
+
+def _reset_thresholds(category: str) -> None:
+    """Restore every threshold for ``category`` to its spec default.
+
+    Used as the popover's *Reset to defaults* callback. Writing into
+    ``session_state`` before the widget instantiates on the next rerun
+    propagates the change into the input controls.
     """
-    if signals_df.empty:
-        return signals_df
+    for k, v in DEFAULT_THRESHOLDS[category].items():
+        st.session_state[_threshold_key(category, k)] = v
 
-    cat = category.lower()
-    df = signals_df.copy()
 
-    # Ensure cols exist; fill missing with safe defaults so filters don't crash
-    for col in ("drawdown_from_52w_high_pct", "vol_ratio_1d", "iss_score",
-                "rs_vs_nifty_3m", "momentum_flag", "event_flag",
-                "accumulation_flag", "return_1d", "return_1m"):
+def _format_threshold_summary(category: str) -> str:
+    """Build a one-line human-readable summary of the active thresholds."""
+    if category == "Contrarian Opportunities":
+        return (
+            f"ideal · DD ≤ {_get_threshold(category, 'ideal_dd_pct_max'):.0f}% · "
+            f"vol ≤ {_get_threshold(category, 'ideal_vol_ratio_max'):.2f}x · "
+            f"ISS ≥ {_get_threshold(category, 'ideal_iss_min'):.0f}  →  "
+            f"relaxed · DD ≤ {_get_threshold(category, 'relaxed_dd_pct_max'):.0f}% · "
+            f"vol ≤ {_get_threshold(category, 'relaxed_vol_ratio_max'):.2f}x"
+        )
+    if category == "Momentum Leaders":
+        return (
+            f"ideal · ISS ≥ {_get_threshold(category, 'ideal_iss_min'):.0f} · "
+            f"rs_3m > {_get_threshold(category, 'ideal_rs_3m_min'):.0f} · "
+            f"momentum_flag  →  relaxed · "
+            f"rs_1m > {_get_threshold(category, 'relaxed_rs_1m_min'):.0f} · "
+            f"ret_1m > {_get_threshold(category, 'relaxed_ret_1m_min'):.0f} · "
+            f"ISS > {_get_threshold(category, 'relaxed_iss_min'):.0f}"
+        )
+    if category == "Event-Driven Candidates":
+        return (
+            f"ideal · event_flag · ISS ≥ {_get_threshold(category, 'ideal_iss_min'):.0f}"
+            f"  →  relaxed · event_flag OR signal_category = EventDriven"
+        )
+    if category == "Volume-Confirmed Movers":
+        return (
+            f"vol > {_get_threshold(category, 'vol_ratio_min'):.2f}x · "
+            f"return_1d > {_get_threshold(category, 'return_1d_min'):.1f}%"
+        )
+    return ""
+
+
+def _ensure_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Make every filter column safe to read; fill missing with 0."""
+    for col in (
+        "drawdown_from_52w_high_pct", "vol_ratio_1d", "iss_score",
+        "rs_vs_nifty_1m", "rs_vs_nifty_3m", "momentum_flag", "event_flag",
+        "accumulation_flag", "return_1d", "return_1m", "signal_category",
+    ):
         if col not in df.columns:
             df[col] = 0
+    return df
+
+
+def _filter_category(
+    signals_df: pd.DataFrame,
+    category: str,
+) -> tuple[pd.DataFrame, str]:
+    """Apply category filters with a fallback when the ideal gate is empty.
+
+    Threshold values come from ``st.session_state`` (seeded by
+    :data:`DEFAULT_THRESHOLDS`) so the popover controls in
+    :func:`_render_threshold_controls` flow straight into the filter on the
+    next rerun without any prop-drilling.
+
+    Returns ``(rows, gate_label)`` where ``gate_label`` records the filter
+    that produced the rows so the panel header can disclose whether the
+    surfaced names cleared the spec gate or a relaxed one.
+    """
+    if signals_df.empty:
+        return signals_df, "ideal"
+
+    cat = category.lower()
+    df = _ensure_cols(signals_df.copy())
 
     if cat == "contrarian opportunities":
-        mask = (
-            (df["drawdown_from_52w_high_pct"] <= -20)
-            & (df["vol_ratio_1d"] <= 0.85)
-            & (df["iss_score"] >= min_iss)
-        )
-        out = df[mask].copy()
+        ideal = df[
+            (df["drawdown_from_52w_high_pct"] <= _get_threshold(category, "ideal_dd_pct_max"))
+            & (df["vol_ratio_1d"] <= _get_threshold(category, "ideal_vol_ratio_max"))
+            & (df["iss_score"] >= _get_threshold(category, "ideal_iss_min"))
+        ]
+        if not ideal.empty:
+            out = ideal.copy()
+            gate = "ideal"
+        else:
+            out = df[
+                (df["drawdown_from_52w_high_pct"] <= _get_threshold(category, "relaxed_dd_pct_max"))
+                & (df["vol_ratio_1d"] <= _get_threshold(category, "relaxed_vol_ratio_max"))
+            ].copy()
+            gate = "relaxed"
         out["key_reason"] = out.apply(
-            lambda r: f"Deep DD ({r['drawdown_from_52w_high_pct']:.0f}%) · Vol contraction ({r['vol_ratio_1d']:.2f}x)",
+            lambda r: (
+                f"DD {r['drawdown_from_52w_high_pct']:.0f}% off 52WH · "
+                f"vol {r['vol_ratio_1d']:.2f}x (contraction)"
+            ),
             axis=1,
         )
         out["primary_signal"] = "Accumulation"
         out["signal_kind"] = "info"
+
     elif cat == "momentum leaders":
-        mask = (
-            (df["iss_score"] >= max(min_iss, 70))
-            & (df["rs_vs_nifty_3m"] > 0)
+        ideal = df[
+            (df["iss_score"] >= _get_threshold(category, "ideal_iss_min"))
+            & (df["rs_vs_nifty_3m"] > _get_threshold(category, "ideal_rs_3m_min"))
             & (df["momentum_flag"].astype(bool))
+        ]
+        if not ideal.empty:
+            out = ideal.copy()
+            gate = "ideal"
+        else:
+            # rs_vs_nifty_3m is sparse (TODO-127); fall back to 1M RS which
+            # is populated, and use signal_category + rising trend as proxies.
+            out = df[
+                (df["rs_vs_nifty_1m"] > _get_threshold(category, "relaxed_rs_1m_min"))
+                & (df["return_1m"] > _get_threshold(category, "relaxed_ret_1m_min"))
+                & (df["iss_score"] > _get_threshold(category, "relaxed_iss_min"))
+            ].copy()
+            gate = "relaxed"
+        out["key_reason"] = out.apply(
+            lambda r: (
+                f"1M RS {float(r['rs_vs_nifty_1m']) * 100:+.1f}pp · "
+                f"1M ret {float(r['return_1m']) * 100:+.1f}%"
+            ),
+            axis=1,
         )
-        out = df[mask].copy()
-        out["key_reason"] = "Strong momentum · ISS ≥ 70 · RS > 0 · momentum flag set"
         out["primary_signal"] = "Momentum"
         out["signal_kind"] = "pos"
+
     elif cat == "event-driven candidates":
-        mask = (df["event_flag"].astype(bool)) & (df["iss_score"] >= min_iss)
-        out = df[mask].copy()
+        ideal = df[
+            (df["event_flag"].astype(bool))
+            & (df["iss_score"] >= _get_threshold(category, "ideal_iss_min"))
+        ]
+        if not ideal.empty:
+            out = ideal.copy()
+            gate = "ideal"
+        else:
+            out = df[
+                df["event_flag"].astype(bool)
+                | (df["signal_category"] == "EventDriven")
+            ].copy()
+            gate = "relaxed"
         out["key_reason"] = "Recent qualifying corporate event · monitor follow-through"
         out["primary_signal"] = "Event-Driven"
         out["signal_kind"] = "evt"
+
     elif cat == "volume-confirmed movers":
-        mask = (df["vol_ratio_1d"] > 2.0) & (df["return_1d"] > 0)
-        out = df[mask].copy()
+        out = df[
+            (df["vol_ratio_1d"] > _get_threshold(category, "vol_ratio_min"))
+            & (df["return_1d"] * 100 > _get_threshold(category, "return_1d_min"))
+        ].copy()
+        gate = "ideal"
         out["key_reason"] = out.apply(
             lambda r: f"Vol {r['vol_ratio_1d']:.2f}x with {r['return_1d']*100:+.1f}% gain",
             axis=1,
         )
         out["primary_signal"] = "Volume-Confirmed"
         out["signal_kind"] = "pos"
+
     else:
         out = df.iloc[0:0].copy()
         out["key_reason"] = []
         out["primary_signal"] = []
         out["signal_kind"] = []
+        gate = "ideal"
 
-    return out
+    return out, gate
 
 
 # --------------------------- Mini-gauge SVG ------------------------------ #
@@ -300,6 +449,147 @@ def _watchlist_column_config() -> dict:
     }
 
 
+# ------------------------ Threshold controls UI ------------------------ #
+
+
+def _render_threshold_controls(category: str) -> None:
+    """Popover with number inputs for every adjustable threshold.
+
+    Widgets bind directly to ``st.session_state`` via their ``key=`` arg,
+    so changes propagate to ``_filter_category`` on the next rerun without
+    needing an explicit submit. A *Reset to defaults* button writes the
+    spec values back via :func:`_reset_thresholds` (callback path, fires
+    before the script re-runs, so the inputs pick up the new values).
+    """
+    with st.popover("⚙ Adjust thresholds", use_container_width=False):
+        st.markdown(
+            f'<div class="kicker">{escape(category)} · gate values</div>',
+            unsafe_allow_html=True,
+        )
+
+        if category == "Contrarian Opportunities":
+            col_i, col_r = st.columns(2)
+            with col_i:
+                st.markdown('<div class="kicker">Ideal gate</div>', unsafe_allow_html=True)
+                st.number_input(
+                    "Drawdown ≤ (%)",
+                    min_value=-95.0, max_value=0.0, step=1.0,
+                    value=_get_threshold(category, "ideal_dd_pct_max"),
+                    key=_threshold_key(category, "ideal_dd_pct_max"),
+                    help="Stock must be at least this far off its 52-week high.",
+                )
+                st.number_input(
+                    "Vol ratio ≤ (x)",
+                    min_value=0.05, max_value=5.0, step=0.05,
+                    value=_get_threshold(category, "ideal_vol_ratio_max"),
+                    key=_threshold_key(category, "ideal_vol_ratio_max"),
+                    help="Today's volume vs 20-day average — contraction signal.",
+                )
+                st.number_input(
+                    "ISS ≥",
+                    min_value=0.0, max_value=100.0, step=5.0,
+                    value=_get_threshold(category, "ideal_iss_min"),
+                    key=_threshold_key(category, "ideal_iss_min"),
+                )
+            with col_r:
+                st.markdown('<div class="kicker">Relaxed fallback</div>', unsafe_allow_html=True)
+                st.number_input(
+                    "Drawdown ≤ (%)",
+                    min_value=-95.0, max_value=0.0, step=1.0,
+                    value=_get_threshold(category, "relaxed_dd_pct_max"),
+                    key=_threshold_key(category, "relaxed_dd_pct_max"),
+                )
+                st.number_input(
+                    "Vol ratio ≤ (x)",
+                    min_value=0.05, max_value=5.0, step=0.05,
+                    value=_get_threshold(category, "relaxed_vol_ratio_max"),
+                    key=_threshold_key(category, "relaxed_vol_ratio_max"),
+                )
+
+        elif category == "Momentum Leaders":
+            col_i, col_r = st.columns(2)
+            with col_i:
+                st.markdown('<div class="kicker">Ideal gate</div>', unsafe_allow_html=True)
+                st.number_input(
+                    "ISS ≥",
+                    min_value=0.0, max_value=100.0, step=5.0,
+                    value=_get_threshold(category, "ideal_iss_min"),
+                    key=_threshold_key(category, "ideal_iss_min"),
+                )
+                st.number_input(
+                    "rs_3m >",
+                    min_value=-1.0, max_value=1.0, step=0.01,
+                    value=_get_threshold(category, "ideal_rs_3m_min"),
+                    key=_threshold_key(category, "ideal_rs_3m_min"),
+                    help="Relative strength vs Nifty over 3 months. "
+                         "Note: rs_3m is sparse upstream (TODO-127).",
+                )
+                st.markdown(
+                    '<div class="mono" style="font-size:10px;color:var(--tx3);margin-top:4px">'
+                    'momentum_flag is required (boolean, not adjustable).'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+            with col_r:
+                st.markdown('<div class="kicker">Relaxed fallback</div>', unsafe_allow_html=True)
+                st.number_input(
+                    "ISS >",
+                    min_value=0.0, max_value=100.0, step=5.0,
+                    value=_get_threshold(category, "relaxed_iss_min"),
+                    key=_threshold_key(category, "relaxed_iss_min"),
+                )
+                st.number_input(
+                    "rs_1m >",
+                    min_value=-1.0, max_value=1.0, step=0.01,
+                    value=_get_threshold(category, "relaxed_rs_1m_min"),
+                    key=_threshold_key(category, "relaxed_rs_1m_min"),
+                )
+                st.number_input(
+                    "ret_1m >",
+                    min_value=-1.0, max_value=1.0, step=0.01,
+                    value=_get_threshold(category, "relaxed_ret_1m_min"),
+                    key=_threshold_key(category, "relaxed_ret_1m_min"),
+                )
+
+        elif category == "Event-Driven Candidates":
+            st.markdown('<div class="kicker">Ideal gate</div>', unsafe_allow_html=True)
+            st.number_input(
+                "ISS ≥",
+                min_value=0.0, max_value=100.0, step=5.0,
+                value=_get_threshold(category, "ideal_iss_min"),
+                key=_threshold_key(category, "ideal_iss_min"),
+            )
+            st.markdown(
+                '<div class="mono" style="font-size:10px;color:var(--tx3);margin-top:6px;line-height:1.5">'
+                'event_flag is required (boolean, not adjustable).<br>'
+                'Relaxed fallback = event_flag OR signal_category = EventDriven (no tuning).'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        elif category == "Volume-Confirmed Movers":
+            st.number_input(
+                "Vol ratio > (x)",
+                min_value=0.1, max_value=10.0, step=0.1,
+                value=_get_threshold(category, "vol_ratio_min"),
+                key=_threshold_key(category, "vol_ratio_min"),
+                help="Today's volume vs 20-day average — confirmation signal.",
+            )
+            st.number_input(
+                "return_1d > (%)",
+                min_value=-20.0, max_value=20.0, step=0.5,
+                value=_get_threshold(category, "return_1d_min"),
+                key=_threshold_key(category, "return_1d_min"),
+            )
+
+        st.button(
+            "Reset to defaults",
+            key=f"wl_thresh__reset__{category}",
+            on_click=_reset_thresholds,
+            args=(category,),
+        )
+
+
 # ------------------------- CSV export helper ---------------------------- #
 
 
@@ -391,7 +681,7 @@ def _render_category_panel(
     slot_key: str,
 ) -> Optional[pd.Series]:
     """Render one tab: filter chips + table + export button."""
-    filtered = _filter_category(signals_df, category)
+    filtered, gate = _filter_category(signals_df, category)
     n = len(filtered)
 
     # Sort pinned to top, then by ISS descending
@@ -400,23 +690,43 @@ def _render_category_panel(
             _pin_sort=filtered["symbol"].apply(lambda s: 0 if s in pinned else 1)
         ).sort_values(["_pin_sort", "iss_score"], ascending=[True, False]).drop(columns=["_pin_sort"])
 
-    st.markdown(
-        f"""
-<div style="padding:8px 4px 4px 4px;display:flex;align-items:baseline;justify-content:space-between">
-  <div>
-    <div class="kicker">7.1 · {escape(category)}</div>
-    <div class="serif" style="font-size:18px;line-height:1.2">{n} name{'s' if n != 1 else ''}{' · ' + str(sum(1 for s in filtered.get('symbol', []) if s in pinned)) + ' pinned' if n else ''}</div>
+    gate_pill = (
+        pill("ISS gate relaxed · scoring distribution still warming up", "warn")
+        if gate == "relaxed"
+        else ""
+    )
+    pinned_count = sum(1 for s in filtered.get("symbol", []) if s in pinned)
+    pinned_suffix = f" · {pinned_count} pinned" if n else ""
+    summary = escape(_format_threshold_summary(category))
+
+    col_hdr, col_ctrl = st.columns([5, 1], gap="small")
+    with col_hdr:
+        st.markdown(
+            f"""
+<div style="padding:8px 4px 4px 4px">
+  <div class="kicker">7.1 · {escape(category)}</div>
+  <div class="serif" style="font-size:18px;line-height:1.2">{n} name{'s' if n != 1 else ''}{pinned_suffix}</div>
+  <div class="mono" style="font-size:10.5px;color:var(--tx3);margin-top:6px;line-height:1.5">
+    <span class="tx2" style="letter-spacing:1px">ACTIVE THRESHOLDS · </span>{summary}
   </div>
-  <div class="mono" style="font-size:10px;color:var(--tx3)">click row → ISS gauge · pin via watchlist.yaml</div>
+  <div style="margin-top:6px">{gate_pill}</div>
 </div>
 """,
-        unsafe_allow_html=True,
-    )
+            unsafe_allow_html=True,
+        )
+    with col_ctrl:
+        st.markdown(
+            '<div class="mono" style="font-size:10px;color:var(--tx3);'
+            'padding:8px 0 4px 0;text-align:right">click row → ISS gauge</div>',
+            unsafe_allow_html=True,
+        )
+        _render_threshold_controls(category)
 
     if filtered.empty:
         st.markdown(
             '<div class="sub" style="padding:24px;text-align:center;color:var(--tx3);'
-            "font-family:'JetBrains Mono',monospace;font-size:11px\">no candidates for current thresholds</div>",
+            "font-family:'JetBrains Mono',monospace;font-size:11px\">"
+            "no candidates pass ideal gate or fallback for this date</div>",
             unsafe_allow_html=True,
         )
         return None

@@ -16,7 +16,7 @@ Everything below must be completed before we move to Phase 2.
 
 Single source of truth for the status of every TODO-### in this file. Update on completion of each item. The per-section detail blocks below stay as the spec / why / depends-on reference; this table is the at-a-glance roll-up.
 
-Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: TODO-002, 111, 116, 117, 118, 119, 121 were all silently done already, and three of the five "Cross-cutting spec deviations" (signal_category labels, volume_trend regression, direction_consistency) had been quietly fixed too. Genuinely-remaining wave-1 work is now narrow: **TODO-114** (`is_nifty50_member` utility — verifiably absent), **TODO-NEW** (signal_registry — only the docstring at `analytics/__init__.py` exists; no formal contract), **TODO-120** (rewrite corporate-events ingestor with the spec's qualitative taxonomy), and **two TODO-122 sub-fixes** (iss_score 7-factor composite, rs_vs_nifty_* NULL semantics).
+Last updated: **2026-05-16** — wave-1 cleanup + UI audit. Six items shipped on `feature/wave-1-remaining-todos`: TODO-123 (VA rules), TODO-112 (seed CSV), TODO-115 (seed validation), TODO-127 (orchestrator FK-ordered), TODO-128 (validation report), TODO-124 (Alembic baseline). Tests for the first five passing (38 in the two new test files plus the existing suite); Alembic baseline verified via offline-SQL dry-run. Playwright audit of the dashboard surfaced three new tracked items: **TODO-130** (stale UI placeholders for data that's now lit — closed on `feature/todo-130-wire-stale-ui-placeholders`), **TODO-131** (`dim_stock.market_cap_cr` empty for all 50 stocks), **TODO-132** (`fact_corporate_action` has 0 rows despite table/parser/loader all done). Remaining wave-1 infra items follow: TODO-113, TODO-129, TODO-125, TODO-126.
 
 **Sort order:** **Open / Partial items are sorted by signal-value priority** — what each TODO unlocks for the investment-decision flow on the dashboard. The reasoning per rank is in the "Why this rank" column. Done items are listed below the open set in numeric ID order, since their relative ranking no longer affects the next-action decision.
 
@@ -24,18 +24,12 @@ Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: T
 
 | Rank | ID | Title | Milestone | Status | Why this rank for signal value |
 |---|---|---|---|---|---|
-| ⭐ 3 | 123 | `mart_volume_anomaly` table | M1.5 | ⬜ Open | Spec VA-1…VA-7 rules pre-computed with consistent thresholds + event-proximity check. §07 currently approximates client-side from `vol_ratio_1d` — works but weaker than spec rules. |
-| 4 | 103 | MTO delivery data ingestion (`delivery_qty/pct`) | M1.1 | 🟨 In-progress (off-branch) | Delivery % distinguishes real conviction from intraday churn. **Implementation lives on `feature/wave-1-mto-validation` commit `5808633`** — not yet merged to main. Unblocks VA-6 / VA-7, §07 delivery column, ISS Factor 2 delivery component. |
-| 5 | 105 | Corrupted-download validation (checksum / row-count) | M1.1 | 🟨 In-progress (off-branch) | Same branch as TODO-103 (`5808633`). Pre-parse size + row + reference-ratio gates land in `ingestion/download_validator.py`. |
-| 8 | 112 | Seed `nifty50_history.csv` (5-year reconstitution) | M1.3 | ⬜ Open | Today the constituent loader writes only the current snapshot (`ind_nifty50list.csv`). A real 5-year history compiled from NSE circulars unlocks point-in-time membership queries. |
-| 9 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. |
-| 10 | 115 | Seed-CSV validation before insert | M1.3 | ⬜ Open | Quality gate for 112. P1 reliability. |
-| 11 | 127 | Backfill orchestrator (5-year, FK-ordered) | M1.5 | ⬜ Open | More history → longer-period ISS factors, longer Trend Workbench periods, better statistical baselines. **Gates RS-3M and RS-1Y** post-TODO-106. |
-| 12 | 128 | Backfill validation report (gaps, 52WK cross-check) | M1.5 | ⬜ Open | Paired with 127. |
-| 13 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
-| 14 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
-| 15 | 124 | Alembic migrations for all tables | M1.5 | ⬜ Open | Schema-management infra. Zero direct signal value. |
-| 16 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
+| ⭐ 1 | 132 | Run `fact_corporate_action` daily ingestion | M1.4 | ⬜ Open | Table exists (TODO-116 ✅), parser exists (TODO-117 ✅), loader exists (TODO-118 ✅), but DB has 0 rows. Daily pipeline does not invoke `CorporateActionsLoader`. Unblocks dividend-adjusted returns, ex-date markers on Trend Workbench, and ISS Factor 5 corporate-action component. |
+| 2 | 131 | Populate `dim_stock.market_cap_cr` | M1.1 | ⬜ Open | Column exists (TODO-102 ✅) but is NULL for all 50 stocks. Treemap cell sizing falls back to ISS score per `dashboard/overview.py:361` caption. Needs a one-time seed (snapshot from NSE security master or Screener export) plus a refresh cadence — monthly is fine since mcap doesn't move the treemap meaningfully day-to-day. |
+| 3 | 113 | Constituent maintenance loader (add/del/rebalance) | M1.3 | 🟨 Partial | `ingestion/framework/loaders/constituents_loader.py` writes a snapshot row (effective_from=trade_date, change_type='Addition') idempotently. Spec wants explicit add/del/rebalance JSON intake; defer until reconstitution math actually drifts. TODO-112 seed loader (just closed) handles the 50 ADD rows for the baseline; this item only matters when NSE publishes a real reconstitution. |
+| 4 | 129 | Local download cache during backfill | M1.5 | ⬜ Open | Operational speed. No signal value. |
+| 5 | 125 | `symbol_alias` table | M1.5 | ⬜ Open | Edge-case for back-test continuity through renames. Rare. |
+| 6 | 126 | Composite + BRIN indexes on fact / mart tables | M1.5 | ⬜ Open | Query speed only. |
 
 ### Closed items (numeric ID order)
 
@@ -43,6 +37,7 @@ Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: T
 |---|---|---|---|---|
 | 001 | CSV column-header validation | Cross-cutting | ✅ Done | — |
 | 003 | Idempotency across ingestion scripts | Cross-cutting | ✅ Done | — |
+
 | 004 | Rate limiting for NSE downloads | Cross-cutting | ✅ Done | — |
 | 101 | `fact_eod_price` columns (14) align with spec | M1.1 | ✅ Done | — |
 | 102 | `dim_stock` columns (10) align with spec | M1.1 | ✅ Done | — |
@@ -69,15 +64,20 @@ Last updated: **2026-05-15** — full wave-1 audit. The ladder was misleading: T
 | 122-d | `iss_score` 7-factor 0-100 composite wired | M1.5 | ✅ Done | Confirmed in audit: `analytics/iss_scorer.py` implements all seven factors per spec §7; `analytics/compute_signals.py:290` calls `compute_iss(row_dict)` per symbol and overwrites the line-215 placeholder with the real score at line 301. |
 | 122-e | `rs_vs_nifty_*` NULL semantics | M1.5 | ✅ Done | Migration `sql/migrations/005_rs_vs_nifty_nullable.sql` drops the `NOT NULL DEFAULT 0` from `rs_vs_nifty_1m` / `rs_vs_nifty_3m` (schema.sql updated to match). `compute_signals.py` no longer fills these to 0 in `not_null_defaults`, so insufficient history flows through as NULL. `iss_scorer.py` now centralises missing-value handling in a `_missing(value)` helper that catches both `None` *and* `NaN`, so the spec's explicit defaults (`return_1y` 3 pts, `rs_vs_nifty_1y` 2 pts) fire correctly on pandas DataFrames. 9 new unit tests in `tests/test_iss_scorer.py` covering all three NaN flavours across F1/F2/F3/F6. |
 | 120 | `ingest_corporate_events.py` — spec-taxonomy keyword classifier | M1.4 | ✅ Done | New `ingestion/event_classifier.py` — 8-category keyword classifier (Earnings/Leadership_Change/M&A/Large_Order/Pledging_Change/Rating_Change/Regulatory/Other) with 1-5 significance scoring per spec §M3.4 and a `is_negative_event` predicate. `corporate_events_ingestor.py` rewritten to use it; the stale `purpose_parser` reuse + Loader's `EVENT_TYPE_MAP` hack are gone. Loader now consumes the spec types directly and writes `follow_up_required` from the negative-event flag. 29 unit tests in `tests/unit/test_event_classifier.py` cover all 8 categories, priority ordering, fallback, and `is_negative` semantics. |
+| 112 | Seed `nifty50_history.csv` (5-year reconstitution) | M1.3 | ✅ Done | `data/raw/reconstitution/nifty50_history.csv` — 50-row baseline (one ADD per current constituent at 2021-01-01). Loader `ingestion/nifty50_history_loader.py` validates + bulk-inserts via `INSERT … ON CONFLICT (symbol, effective_from) DO UPDATE`. Wired into backfill orchestrator step 0. Closed 2026-05-16. |
+| 115 | Seed-CSV validation before insert | M1.3 | ✅ Done | `validate_history_csv()` in `ingestion/nifty50_history_loader.py` runs 8 checks: file exists, required columns, no empty symbols, parseable dates, valid ADD/DELETE actions, no duplicate (symbol, effective_from), no overlapping intervals, no two open-ended ADD rows per symbol. 13 unit tests in `tests/unit/test_nifty50_history_loader.py` including the production-file validity check. Closed 2026-05-16. |
+| 123 | `mart_volume_anomaly` table — VA-1…VA-7 rules | M1.5 | ✅ Done | `analytics/compute_volume_anomalies.py:_match_va_rule` evaluates the 7 spec rules in priority order (VA-5 first, VA-4 last). New `va_rule VARCHAR(60)` column on `mart_volume_anomaly` (schema + migration `sql/migrations/006_va_rule_column.sql`). ±3-day event proximity and rolling 5-day dry-up counter computed per symbol. Wired into the post-load analytics chain: `compute_signals.py` calls `compute_volume_anomalies` after `mart_stock_signals` is populated. 25 unit tests in `tests/unit/test_volume_anomaly_engine.py` cover rule priority, threshold boundaries, NULL delivery handling, and edge cases. Closed 2026-05-16. |
+| 127 | Backfill orchestrator (5-year, FK-ordered) | M1.5 | ✅ Done | `ingestion/backfill/orchestrator.py` runs in FK-correct sequence: step 0 (optional) seeds `dim_nifty50_constituent` via `nifty50_history_loader`, step 1 loads `fact_eod_price` + `nifty50_index_prices` per trading day, step 2 runs the analytics chain (52wk → signals → volume anomalies) in one pass at the end. New `--skip-constituents` flag. Closed 2026-05-16. |
+| 128 | Backfill validation report (gaps, 52WK cross-check) | M1.5 | ✅ Done | `ingestion/backfill/validator.py` — per-year report covering row counts for 7 tables, monthly symbol coverage in `fact_eod_price`, missing-trading-day gap detection vs business-day calendar, duplicate-key check on `(trade_date, symbol)`, `pct_from_high` sanity, and a flag list (`ZERO_EOD_PRICES`, `HIGH_GAP_COUNT_N`, `DUPLICATE_KEYS`, `SIGNALS_NOT_COMPUTED`, `NO_INDEX_PRICES`). CLI: `python -m ingestion.backfill.validator --year 2024` for one year, `--all` for 2021→present. Closed 2026-05-16. |
+| 124 | Alembic migrations for all tables | M1.5 | ✅ Done | `alembic.ini` + `alembic/env.py` (reads `settings.db_url` at import time; the `sqlalchemy.url` placeholder in alembic.ini is never used at runtime) + `alembic/versions/0001_baseline_baseline_schema.py` which runs `sql/schema.sql` verbatim via `op.execute()`. Idempotent because every CREATE in schema.sql uses IF NOT EXISTS — `alembic upgrade head` is a no-op on existing DBs after `alembic stamp 0001_baseline`. **Post-baseline rule:** `alembic/versions/` is canonical; new schema changes go through `alembic revision`, not direct edits to schema.sql or new `sql/migrations/*.sql` files. Operator README at `alembic/README`. Closed 2026-05-16. |
+| 130 | Wire stale dashboard placeholders to live data | UI | ✅ Done | `api/main.py` adds a `nifty_index` block to `/market-overview` (close, prev_close, return_1d, realized_vol_20d, window_days) sourced from `nifty50_index_prices`. §01 KPI cards #1 (Nifty 50 Index) and #4 (Realized Vol · 20D) render live values when calc_date is in-window; #2 (52-Week Bracket) stays muted with a truthful "need 252 sessions, have N" hint until the index backfill reaches a year. §03 filter-row legend swaps the "RS · Nifty unavailable" warn pill for a plain `RS · Nifty` overlay tag; stats sidebar only emits the warn pill when `payload.rs_vs_nifty_series` is None (out-of-window calc_dates). §08 header hint no longer dangles the closed TODO-119/120 ref. 4 integration scenarios still pass. Closed 2026-05-16. |
 
 **Status legend:** ✅ Done · 🟨 Partial · ⬜ Open · 🚫 Blocked (explicit hard block — call out in Notes).
 
-**Bracketed reading of the ladder (post 2026-05-15 audit):**
-- **Ranks 1–3 (⭐):** Highest signal-value remaining work. Each materially upgrades a dashboard section.
-- **Ranks 4–5:** TODO-103 / TODO-105 — already implemented on `feature/wave-1-mto-validation` (commit `5808633`); listed here for accounting until that branch merges.
-- **Ranks 6–7:** Plumbing — `is_nifty50_member` utility and the signal_registry contract refactor. Small but high-leverage.
-- **Ranks 8–10:** Universe correctness — matters for back-testing and historical Trend Workbench.
-- **Ranks 11–16:** Reliability, ops, and infra. Necessary for Phase 1 closure but no incremental signal value. Rank 11 (TODO-127) is still the immediate post-TODO-106 unlock for RS-3M / RS-1Y.
+**Bracketed reading of the ladder (post 2026-05-16 wave-1 close-out):**
+- **Rank 1:** TODO-113 is the only remaining item with even a thin signal-value link — handling true reconstitution drift. Defer until NSE actually rebalances.
+- **Ranks 2–5:** Pure infra (cache, alias table, Alembic, indexes). Necessary for Phase 1 closure but zero incremental dashboard value.
+- Five items closed in this pass (123, 112, 115, 127, 128) had clustered around the M1.5 boundary; landing them in one branch keeps the merge churn cheap.
 
 **Maintenance rules:**
 1. Closing an item → update Status to ✅ and append the closing commit SHA (or PR #) to Notes.
@@ -112,6 +112,48 @@ Tracked at section-level for now; will be broken into individual TODOs when M1 c
 |---|---|---|
 | `api/routers/watchlist.py:98` | "Replace with actual user authentication" | ⬜ Open |
 | `ingestion/framework/loaders/reconstitution_loader.py:12` | "Implement upsert once CSV format confirmed" | ⬜ Open — subsumed by TODO-113 |
+
+---
+
+## Data Backfill Requirements
+
+Snapshot as of **2026-05-17**. The dashboard ships against whatever's in Postgres — every gate, gauge, treemap, and signal table feeds off the same handful of tables below. Until the **Target** column is met, the corresponding dashboard surface either shows a muted pending hint (Card #2 52W Bracket, RS overlays on early dates) or relaxes its filter with a visible "gate relaxed" pill (§02 Watchlist categories).
+
+### Coverage matrix — what's lit vs. what's still empty
+
+| Table | Current | Target | Backfill command | Cadence | Unblocks |
+|---|---|---|---|---|---|
+| `dim_stock` | 6,442 rows (58 Nifty 50 members) | NSE security master fully populated | `python -m ingestion.framework.run_pipeline --source dim-stock --date YYYY-MM-DD --local-file NSE_CM_security_DDMMYYYY.csv` | Monthly (or on reconstitution) | Sector/industry labels, ISIN joins |
+| `dim_stock.market_cap_cr` | **0 / 50** Nifty 50 names populated (NULL) | All 50 hydrated | Manual seed pending (TODO-131) | Monthly | Treemap cell sizing (currently falls back to ISS) |
+| `dim_nifty50_constituent` | 14,450 rows · 2025-04-01 → 2026-05-08 | 2021-01-01 → today (per spec §C) | `python -m ingestion.framework.run_pipeline --source constituents --start 2021-01-01 --end YYYY-MM-DD` (and reconstitution drops in `data/raw/reconstitution/`) | On reconstitution (Mar / Sep), reseed via `data/raw/reconstitution/nifty50_history.csv` | Point-in-time membership for §03 sector RS aggregation |
+| `fact_eod_price` | 111,028 rows · 43 trading days · 2026-03-11 → 2026-05-08 | **5 years** (~1,260 sessions) per spec M1.5 | `python -m ingestion.backfill.orchestrator --start 2021-01-01 --end YYYY-MM-DD` (+ `--local data/bhavcopy` for cached CSVs) | Daily EOD via `python -m ingestion.daily_run` | All return columns, 52W computation, RS series, scanner gates |
+| `fact_52wk` | 111,028 rows · 43 trading days (derived) | Recomputed after each `fact_eod_price` extension | `python -m analytics.compute_52wk` | Daily EOD (auto after bhavcopy) | Drawdown scanner thresholds, breakout monitor |
+| `nifty50_index_prices` | **38 rows** · 2026-03-11 → 2026-05-08 | **≥ 252 sessions** for §01 Card #2 (52W Bracket) | `python -m ingestion.daily_run` (index step) or backfill via `python -m ingestion.backfill.orchestrator` | Daily EOD; backfill once to ≥ 252 sessions | §01 Cards #1/#2/#4, §03 RS overlay outside the current 38-day window |
+| `fact_corporate_action` | **0 rows** | Dividends / splits / bonuses / buybacks for last 1 year | Loader exists (`ingestion/corporate_actions_loader.py`) but **not wired into the daily pipeline** — TODO-132 | Daily EOD once wired | Dividend-adjusted returns, ex-date markers on §03 Trend Workbench, ISS Factor 5 |
+| `fact_corporate_event` | 944 rows · 2026-04-28 → 2026-05-30 | Earnings / AGM / board-meeting calendar (forward + 1 year back) | `python -m ingestion.nse_scraper --source event-calendar` and `--source announcements`; framework: `--source event-calendar / announcements` | Daily (calendar) + Hourly during market hours (announcements) | §08 Events tracker, §03 event annotations, Event-Driven watchlist tab |
+| `mart_stock_signals` | 111,028 rows · 43 days (derived) | Recomputed after each new `fact_eod_price` day | `python -m analytics.compute_signals --date YYYY-MM-DD` | Daily EOD (auto via orchestrator post-load step) | §01-§07 entire dashboard |
+| `mart_volume_anomaly` | 111,028 rows · 43 days (derived) | Recomputed alongside signals | `python -m analytics.compute_volume_anomalies --date YYYY-MM-DD` | Daily EOD (auto via orchestrator post-load step) | §07 Volume Anomaly Monitor, VA-1…VA-7 rule tagging |
+| `alerts` | 55 rows | Whatever the alert engine fires per day | `python -m alerts.alert_engine` (via `scripts/run_analytics.sh`) | Daily EOD (post-signals) | Phase 5 — out of M1 scope but rules already wired |
+| `ingestion_log` | 2 rows | One row per ingestion run | Auto-written by `Pipeline.run()` | Per ingestion run | Operational visibility · drives `--check` outputs |
+
+### What "fully populated" actually requires
+
+Three concrete backfill jobs would clear the remaining gating issues that today force muted UI states and relaxed §02 gates:
+
+1. **5-year EOD price history** — `python -m ingestion.backfill.orchestrator --start 2021-01-01 --end $(date +%F)` followed by `--skip-index` if index data is sourced separately, or just leave index-step enabled. Run once; ~1 hour with NSE rate limits. Unlocks 52-week math against real historical highs, kills the relaxed Contrarian/Drawdown gates, and gives §03 a full 6M/1Y/3Y window of data.
+2. **Index price extension** — same orchestrator covers it, or run `python -m ingestion.backfill.orchestrator --start 2021-01-01 --end $(date +%F)` (no `--skip-index`). Specifically extends `nifty50_index_prices` past the current 38-day window so the §01 52-Week Bracket card can render an honest 52W high/low and the §03 RS overlay covers older windows.
+3. **Corporate actions daily wiring** — fix TODO-132 by invoking `CorporateActionsLoader` from `ingestion/daily_run.py` (or scheduling it in the daily DAG). Backfill the last year once it's wired: `python -m ingestion.framework.run_pipeline --source corporate-actions --start 2025-05-17 --end $(date +%F)`. Unblocks the Event-Driven tab's ideal gate (currently always relaxed) and §03 ex-date markers.
+
+### Validation cadence
+
+After any backfill run, validate with:
+
+```bash
+python -m ingestion.backfill.validator --year 2024     # one year
+python -m ingestion.backfill.validator --all           # 2021 → present
+```
+
+Flags emitted (`ZERO_EOD_PRICES`, `HIGH_GAP_COUNT_N`, `DUPLICATE_KEYS`, `SIGNALS_NOT_COMPUTED`, `NO_INDEX_PRICES`) should all clear before the dashboard is considered "live-data-ready".
 
 ---
 

@@ -70,6 +70,73 @@ Launch both the API and the Streamlit dashboard using the provided script:
 
 ---
 
+## Operational Cadence — what to run, when
+
+The dashboard reads exclusively from Postgres; freshness of every panel depends on the schedule below. Always activate the venv first: `source venv/bin/activate`.
+
+> See `TODOS.md › Data Backfill Requirements` for the per-table coverage matrix and what each gap unblocks. Detailed CLI options for every command live in the **Command Reference** section that follows.
+
+### One-time bootstrap
+
+Run on a fresh deployment, in this order. The full sequence takes 1–2 hours, dominated by the 5-year backfill download.
+
+| Step | Command | Produces |
+|---|---|---|
+| 1 · Schema | `psql "$DB_URL" -f sql/schema.sql` | All tables, indexes, FK constraints |
+| 2 · Alembic baseline | `alembic stamp 0001_baseline` | Marks DB as already-migrated for future schema changes |
+| 3 · Seed Nifty 50 master | `python -m ingestion.seed_stocks` | `dim_stock` rows for the current 50 constituents |
+| 4 · Seed reconstitution history | `python -m ingestion.framework.run_pipeline --source reconstitution --date 2021-01-01` (CSV at `data/raw/reconstitution/nifty50_history.csv`) | `dim_nifty50_constituent` baseline (point-in-time membership) |
+| 5 · 5-year EOD + index backfill | `python -m ingestion.backfill.orchestrator --start 2021-01-01 --end $(date +%F)` | `fact_eod_price` (~1,260 sessions × 50 symbols) + `nifty50_index_prices` + auto-computes `fact_52wk` / `mart_stock_signals` / `mart_volume_anomaly` post-load |
+| 6 · Validate the backfill | `python -m ingestion.backfill.validator --all` | Per-year report; expect zero flags before declaring live-data-ready |
+| 7 · Corporate-event seed (1 yr) | `python -m ingestion.framework.run_pipeline --source event-calendar --start $(date -v -1y +%F) --end $(date +%F)` then `--source announcements` | `fact_corporate_event` populated |
+
+### Daily — EOD (run after NSE closes, ~6:30 PM IST)
+
+The canonical daily runner is `./scripts/run_daily.sh`; the analytics chain is `./scripts/run_analytics.sh`. They are idempotent — safe to re-run.
+
+| When | Command | Refreshes |
+|---|---|---|
+| **T+0 ~6:30 PM IST** | `./scripts/run_daily.sh` | `fact_eod_price`, `nifty50_index_prices` (and corporate actions / events when `--corporate-actions` / `--corporate-events` flags are passed) |
+| **T+0 ~7:00 PM IST** | `./scripts/run_analytics.sh` | `fact_52wk`, `mart_stock_signals`, `mart_volume_anomaly`, `alerts` |
+
+Run on every trading day, once, in this order. The daily runner accepts `--date YYYY-MM-DD` for replays and `--backfill N` for catching up after a gap; `run_analytics.sh --status` prints current row counts and date ranges across the analytics tables.
+
+### Intraday — announcements (optional, market hours)
+
+| Command | Refreshes | Frequency |
+|---|---|---|
+| `python -m ingestion.nse_scraper --source announcements` | `fact_corporate_event` (filings published since the last scrape) | Hourly during 9:15 AM – 3:30 PM IST trading window |
+
+### Weekly
+
+| When | Command | Why |
+|---|---|---|
+| **Sunday** | `python -m ingestion.backfill.validator --year $(date +%Y)` | Catches missing trading days, duplicate keys, and `pct_from_high` drift before they propagate |
+
+### Monthly
+
+| When | Command | Why |
+|---|---|---|
+| **1st of month** | `python -m ingestion.framework.run_pipeline --source dim-stock --date $(date +%F) --local-file data/raw/dim_stock/NSE_CM_security_$(date +%d%m%Y).csv` | Refreshes sector/industry/ISIN from NSE security master |
+| **1st of month** | (Pending TODO-131) Snapshot `dim_stock.market_cap_cr` from NSE security master or vendor feed | Treemap cell sizing falls back to ISS until this is populated |
+
+### Quarterly — Nifty 50 reconstitution (Mar / Sep)
+
+| When | Command | Why |
+|---|---|---|
+| **Last Friday of Mar / Sep** | Drop NSE-published reconstitution CSV into `data/raw/reconstitution/` and run `python -m ingestion.framework.run_pipeline --source reconstitution --date YYYY-MM-DD` | Maintains point-in-time index membership; without this, post-reconstitution sector aggregates drift |
+
+### Service health & operational checks
+
+| Command | Use case |
+|---|---|
+| `./scripts/run_analytics.sh --status` | At-a-glance row counts + date ranges for `fact_*` / `mart_*` / `alerts` |
+| `./scripts/run_corporate_backfill.sh --check` | File counts in `data/corporate/{actions,events}/` + DB row counts |
+| `./scripts/run_load_bhavcopy.sh --check` | Bhavcopy file count in `data/bhavcopy/` + `fact_eod_price` coverage |
+| `curl http://localhost:8000/health` | API liveness + table row counts |
+
+---
+
 ## Command Reference
 
 > All commands assume the venv is active: `source venv/bin/activate`

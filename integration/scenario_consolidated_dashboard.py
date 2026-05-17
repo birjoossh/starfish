@@ -95,6 +95,7 @@ def _fake_signals_frame() -> pd.DataFrame:
             "accumulation_flag": i % 4 == 0,
             "event_flag": i % 5 == 0,
             "iss_score": 30 + i * 5,
+            "rs_vs_nifty_1m": (i - 5) * 0.008,
             "rs_vs_nifty_3m": (i - 5) * 0.01,
             "rs_vs_nifty_1y": (i - 5) * 0.02,
             "last_event_type": None,
@@ -218,6 +219,191 @@ def test_expand_all_flag_present() -> None:
         at.run()
         _assert_no_runtime_errors(at)
         assert at.session_state["expand_all"] is True
+
+
+def test_kpi_strip_renders_live_nifty_index() -> None:
+    """TODO-130: §01 KPI cards #1 and #4 must show live values when the
+    `/market-overview` payload contains a populated `nifty_index` block.
+
+    The API isn't running under AppTest, so the production code path falls
+    through to the empty fallback in ``fetch_market_overview``. This test
+    patches the fetcher directly so the new KPI renderers actually execute,
+    which is the only way py-only tests can exercise the HTML interpolation
+    in ``_nifty_index_kpi`` and ``_vol_20d_kpi``.
+    """
+    fake = _fake_signals_frame()
+    fake_payload = {
+        "sector_breadth": [
+            {"sector": "Banks", "num_stocks": 2, "advancing": 1, "declining": 1,
+             "avg_return_1d": 0.001, "avg_return_1m": 0.02, "avg_iss": 55.0},
+        ],
+        "components": fake.to_dict("records"),
+        "nifty_index": {
+            "trade_date": "2026-05-08",
+            "close": 24176.15,
+            "prev_close": 24326.65,
+            "return_1d": -0.0061866,
+            "realized_vol_20d": 0.1345,
+            "window_days": 38,
+        },
+    }
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()), \
+         patch("dashboard.overview.fetch_market_overview", return_value=fake_payload):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        at.run()
+        _assert_no_runtime_errors(at)
+        blob = _collect_markdown_text(at)
+        # Card #1 — live close + 1D delta
+        assert "24,176.15" in blob, "card #1 should render the live Nifty close"
+        assert "-0.62%" in blob, "card #1 should render the 1D delta"
+        # Card #2 — muted bracket pending; new hint must NOT reference TODO-106
+        assert "52-Week Bracket" in blob
+        assert "TODO-106" not in blob, (
+            "TODO-130 regression: stale TODO-106 hint resurfaced in §01"
+        )
+        assert "have 38" in blob, "card #2 hint should disclose the actual window size"
+        # Card #4 — live realized vol
+        assert "13.5%" in blob, "card #4 should render the live realized 20D vol"
+
+
+def test_kpi_strip_pending_when_nifty_index_block_empty() -> None:
+    """Out-of-window calc_dates → fallback to muted pending KPIs without
+    referencing closed TODO-106. Guards against regressions where the
+    rendering helpers KeyError on a missing dict key.
+    """
+    fake = _fake_signals_frame()
+    fake_payload = {
+        "sector_breadth": [
+            {"sector": "Banks", "num_stocks": 1, "advancing": 0, "declining": 1,
+             "avg_return_1d": -0.001, "avg_return_1m": -0.01, "avg_iss": 35.0},
+        ],
+        "components": fake.to_dict("records"),
+        "nifty_index": {
+            "trade_date": None,
+            "close": None,
+            "prev_close": None,
+            "return_1d": None,
+            "realized_vol_20d": None,
+            "window_days": 0,
+        },
+    }
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()), \
+         patch("dashboard.overview.fetch_market_overview", return_value=fake_payload):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        at.run()
+        _assert_no_runtime_errors(at)
+        blob = _collect_markdown_text(at)
+        assert "TODO-106" not in blob, (
+            "TODO-130 regression: stale TODO-106 hint resurfaced in §01"
+        )
+        assert "have 0" in blob, "pending hint should disclose window_days=0"
+
+
+def test_pending_trend_focus_drain_no_widget_collision() -> None:
+    """Regression: setting `_pending_trend_subject` before a rerun must NOT
+    raise `StreamlitAPIException: trend_subject cannot be modified after the
+    widget with key trend_subject is instantiated`.
+
+    §03's filter row binds widgets to `trend_subject` / `trend_kind`; row
+    clicks in §04–§07 used to write those keys directly, which Streamlit
+    rejected. The fix routes drill-ins through `_pending_trend_*` slots
+    that `render_trend_section` drains BEFORE the widget binds.
+    """
+    fake = _fake_signals_frame()
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        at.session_state["_pending_trend_subject"] = "SYM03"
+        at.session_state["_pending_trend_kind"] = "stock"
+        at.run()
+        _assert_no_runtime_errors(at)
+        # Drain consumed pending and applied to widget-bound key.
+        keys = set(at.session_state.filtered_state)
+        assert at.session_state["trend_subject"] == "SYM03"
+        assert "_pending_trend_subject" not in keys
+
+
+def test_no_oscillation_with_concurrent_stale_selections() -> None:
+    """Regression: two persistent dataframe selections in different sections
+    must not ping-pong ``trend_subject`` back and forth on every rerun.
+
+    Before the per-source latch landed, this scenario reproduced an
+    infinite-rerun loop: §04 with row 3 selected pushed SYM03, §05 with row
+    5 selected pushed a different symbol, each rerun saw both selections as
+    "still selected" and re-fired ``st.rerun()`` against the other's value.
+    The latch (``_drill_last_<source>``) short-circuits same-symbol calls
+    so the loop terminates.
+    """
+    fake = _fake_signals_frame()
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        # Pre-seed both section dataframe selections so the rerun-driven
+        # `event` payload sees rows selected in §04-gainers and §05-drawdown.
+        at.session_state["movers_g_df"] = {"selection": {"rows": [3], "columns": []}}
+        at.session_state["dd_table"] = {"selection": {"rows": [5], "columns": []}}
+        at.run()
+        _assert_no_runtime_errors(at)
+        # trend_subject must have settled on SOMETHING (not None/missing).
+        # The exact winner depends on render order; what matters is the run
+        # completed within AppTest's default timeout without looping.
+        assert "trend_subject" in at.session_state.filtered_state
+
+
+def test_watchlist_event_driven_populates_with_event_flags() -> None:
+    """§02 Event-Driven panel must surface rows when any signal has
+    `event_flag=True`, even though the spec gate `iss_score >= 50` would
+    have excluded the lone match in this fixture.
+
+    Locks the relaxed-gate fallback added by the §02 fix.
+    """
+    fake = _fake_signals_frame()
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        at.run()
+        _assert_no_runtime_errors(at)
+        blob = _collect_markdown_text(at)
+        # Confirm the empty-state copy isn't dominating across all 4 tabs.
+        assert blob.count("no candidates pass ideal gate or fallback") < 4, (
+            "all four §02 tabs hit the empty state — relaxed gates not firing"
+        )
+
+
+def test_trend_rs_pill_no_stale_todo_reference() -> None:
+    """TODO-130: §03 filter-row legend must not advertise RS as unavailable
+    by default — the warn pill is now scoped to the stats sidebar and only
+    when ``payload.rs_vs_nifty_series`` is None.
+    """
+    fake = _fake_signals_frame()
+    with patch(
+        "config.database.read_sql_df",
+        side_effect=_read_sql_router(dates=None, signals=fake),
+    ), patch("dashboard.watchlist.load_watchlist", return_value=set()):
+        at = AppTest.from_file(APP_PATH, default_timeout=DEFAULT_TIMEOUT)
+        at.run()
+        _assert_no_runtime_errors(at)
+        blob = _collect_markdown_text(at)
+        # Filter row legend was the stale callout — it should no longer be there.
+        assert "RS · Nifty unavailable" not in blob, (
+            "TODO-130 regression: stale 'RS · Nifty unavailable' pill in §03 legend"
+        )
+        # §08 header should not reference closed corporate-events TODOs.
+        assert "TODO-119/120" not in blob, (
+            "TODO-130 regression: stale 'TODO-119/120' hint in §08 header"
+        )
 
 
 if __name__ == "__main__":

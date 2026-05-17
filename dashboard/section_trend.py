@@ -11,12 +11,12 @@ Drill-in: any row click in §02/§04–§08 sets ``st.session_state.trend_subjec
 which feeds this section's subject picker.
 
 Backend gaps (handled gracefully):
-    * ``rs_vs_nifty_series`` will be ``None`` until TODO-106 (NSE index
-      prices) lands — Workbench hides the overlay + shows a "RS unavailable"
-      pill.
-    * ``events`` will be ``[]`` until corporate events ingestion (TODO-119/
-      120) lands — Workbench renders the chart without markers + shows a
-      muted "no events in window" note.
+    * ``rs_vs_nifty_series`` is computed from ``nifty50_index_prices`` and
+      returns None for calc_dates outside the ingested index window — the
+      stats sidebar surfaces a warn pill only in that case.
+    * ``events`` is sourced from ``fact_corporate_event``; if a particular
+      window has no events the chart renders without markers and a muted
+      "no events in window" note appears.
     * ``iss_series`` is constant 0.0 until ISS scoring lands (TODO-122) —
       we render the line but pill the sidebar with "ISS pipeline pending".
 """
@@ -39,6 +39,53 @@ API_URL = "http://localhost:8000"
 
 PERIODS: tuple[str, ...] = ("1M", "3M", "6M", "1Y", "3Y", "YTD")
 DEFAULT_PERIOD = "6M"
+
+
+# --------------------- Cross-section drill-in helper --------------------- #
+#
+# §03's filter row binds widgets to ``trend_subject`` / ``trend_kind``. Once
+# bound, Streamlit forbids writes to those keys from anywhere else in the
+# same script run. §04-§07 row clicks therefore stage the new value in a
+# pending slot; ``render_trend_section`` drains the slot BEFORE its widgets
+# are instantiated on the next rerun.
+
+
+def request_trend_focus(
+    symbol: str, kind: str = "stock", *, source: Optional[str] = None
+) -> None:
+    """Drill into §03 from another section without raising a widget-collision.
+
+    ``source`` is a unique tag identifying the calling section / slot
+    (e.g. ``"movers_g"``, ``"drawdown"``). When two sections have stale
+    selections after a drill from a third, each rerun would otherwise see
+    BOTH sections "still selected" and ping-pong ``trend_subject`` between
+    two values forever. The per-source latch only fires when this specific
+    section's selection genuinely changes — subsequent reruns where the same
+    row remains selected become no-ops, so the loop stops.
+    """
+    if source is not None:
+        last_key = f"_drill_last_{source}"
+        if st.session_state.get(last_key) == symbol:
+            return
+        st.session_state[last_key] = symbol
+    if (
+        st.session_state.get("trend_subject") == symbol
+        and st.session_state.get("trend_kind") == kind
+    ):
+        return
+    st.session_state["_pending_trend_subject"] = symbol
+    st.session_state["_pending_trend_kind"] = kind
+    st.rerun()
+
+
+def _drain_pending_focus() -> None:
+    """Apply any staged ``_pending_trend_*`` writes before widgets bind."""
+    pending_sub = st.session_state.pop("_pending_trend_subject", None)
+    if pending_sub is not None:
+        st.session_state["trend_subject"] = pending_sub
+    pending_kind = st.session_state.pop("_pending_trend_kind", None)
+    if pending_kind is not None:
+        st.session_state["trend_kind"] = pending_kind
 
 
 # ----------------------------- Data accessor ----------------------------- #
@@ -81,6 +128,9 @@ def fetch_trend(subject: str, kind: str, period: str, as_of: str) -> dict[str, A
 
 def render_trend_section(calc_date: str, signals_df: pd.DataFrame) -> None:
     """Render §03 Trend Workbench."""
+    # Drain any drill-in writes BEFORE the filter row binds the widgets.
+    _drain_pending_focus()
+
     # ---- Subject resolution: session_state → signals_df default ----
     default_subject = _pick_default_subject(signals_df)
     if "trend_subject" not in st.session_state:
@@ -188,7 +238,7 @@ def _render_filter_row(signals_df: pd.DataFrame) -> None:
     st.markdown(
         f"""
 <div class="mono" style="font-size:10px;color:var(--tx3);margin-top:6px">
-  Overlays · {pill('Events', 'evt')} {pill('52WH/L', 'acc')} {pill('RS · Nifty unavailable', 'warn')} <span class="tag" style="margin-left:6px">SMA 50</span> <span class="tag">SMA 200</span>
+  Overlays · {pill('Events', 'evt')} {pill('52WH/L', 'acc')} {pill('RS · Nifty', 'acc')} <span class="tag" style="margin-left:6px">SMA 50</span> <span class="tag">SMA 200</span>
   &nbsp;·&nbsp; ↻ click any row in §02–§08 to focus subject here
 </div>
 """,
@@ -372,7 +422,7 @@ def _render_price_volume_chart(payload: dict[str, Any]) -> None:
         st.markdown(
             '<div class="mono" style="font-size:10px;color:var(--tx3);'
             'padding:2px 4px 0 4px">'
-            "no corporate events in this window · TODO-119/120 not yet seeded"
+            "no corporate events in this window"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -491,7 +541,11 @@ def _render_stats_sidebar(payload: dict[str, Any]) -> None:
             return "tx2"
         return "pos" if v > 0 else "neg"
 
-    rs_pill = pill("RS · Nifty unavailable · TODO-106", "warn")
+    rs_pill = (
+        pill("RS · Nifty unavailable for window", "warn")
+        if payload.get("rs_vs_nifty_series") is None
+        else ""
+    )
     iss_pill = pill("ISS pipeline pending · TODO-122", "warn") if (iss_now in (None, 0.0)) else ""
 
     iss_block = ""
@@ -546,8 +600,8 @@ def _render_stats_sidebar(payload: dict[str, Any]) -> None:
     {rs_pill} {iss_pill}
   </div>
   <div class="mono" style="font-size:10px;color:var(--tx3);margin-top:12px;line-height:1.5">
-    Source · <span class="acc">fact_eod_price</span> + <span class="acc">mart_stock_signals</span>.<br>
-    Events / RS pending TODO-106, TODO-119/120, TODO-122.
+    Source · <span class="acc">fact_eod_price</span> + <span class="acc">mart_stock_signals</span> + <span class="acc">fact_corporate_event</span>.<br>
+    ISS factor decomposition pending TODO-122.
   </div>
 </div>
 """,
@@ -627,4 +681,4 @@ def _signals_row(signals_df: pd.DataFrame, symbol: str) -> Optional[pd.Series]:
     return sub.iloc[0]
 
 
-__all__ = ["render_trend_section", "fetch_trend"]
+__all__ = ["render_trend_section", "fetch_trend", "request_trend_focus"]

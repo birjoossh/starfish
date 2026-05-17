@@ -47,7 +47,7 @@ def _ingest_index_price(trade_date: date) -> int:
     daily path stays in sync with the bulk-backfill path without duplicating
     code (TODO-106 daily wiring).
     """
-    from ingestion.backfill.orchestrator import BackfillOrchestrator
+    from archives.backfill.orchestrator import BackfillOrchestrator
     from ingestion.nse_client import CircuitBreakerOpen
 
     orch = BackfillOrchestrator()
