@@ -276,8 +276,8 @@ def get_market_overview(calc_date: Optional[str] = Query(None)):
     nifty_index = _build_nifty_index_block(_resolve_effective_calc_date(calc_date))
 
     return {
-        "sector_breadth": df.to_dict("records") if not df.empty else [],
-        "components": raw.to_dict("records") if not raw.empty else [],
+        "sector_breadth": _sanitize_api_records(df.to_dict("records")) if not df.empty else [],
+        "components": _sanitize_api_records(raw.to_dict("records")) if not raw.empty else [],
         "nifty_index": nifty_index,
     }
 
